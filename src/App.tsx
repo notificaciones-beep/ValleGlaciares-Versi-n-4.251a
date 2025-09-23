@@ -346,6 +346,7 @@ useEffect(() => {
     codigo: code,
     vendedor: getVendorMeta(loggedVendor!).name,
     fechaLSR,
+    fechaPromo,
     lsrSubtotal,
     lsrDcto: lsrDctoAplicado,
     transporte: transporteTotal,
@@ -479,11 +480,13 @@ useEffect(() => {
 
   // 3) Enviar correo (API Vercel)
   try {
+    const cc = ['info@valleglaciares.com','oficina@valleglaciares.com']  // ← CC
     const resp = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ to, subject, html })
+      body: JSON.stringify({ to, subject, html, cc })
     })
+
     const data = await resp.json()
     if(!resp.ok || !data?.ok){
       console.error('Error al enviar correo', data)

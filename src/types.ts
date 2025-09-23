@@ -11,13 +11,26 @@ export type Passenger = {
   categoria: CategoriaLSR, capillas: boolean, grupo: string
 }
 
-export type VoucherData = {
-  codigo: string; vendedor: string; fechaLSR: string;
-  lsrSubtotal: number; lsrDcto: number; transporte: number; totalLSR: number;
-  promoTipo?: 'FM'|'CM'|undefined; promoSubtotal: number; promoDcto: number; totalPromo: number;
-  totalCotizacion: number; pagado: number; saldo: number;
-  pasajeros: Passenger[]; observaciones?: string;
+export interface VoucherData {
+  codigo: string
+  vendedor: string
+  fechaLSR: string
+  fechaPromo?: string   // ← NUEVO: fecha Capillas de Mármol
+  lsrSubtotal: number
+  lsrDcto: number
+  transporte: number
+  totalLSR: number
+  promoTipo?: 'FM' | 'CM'
+  promoSubtotal: number
+  promoDcto: number
+  totalPromo: number
+  totalCotizacion: number
+  pagado: number
+  saldo: number
+  pasajeros: any[]
+  observaciones?: string
 }
+
 
 export type BasePasajerosRow = {
   createdAt: string; estado: 'pre-reserva'|'reserva';
