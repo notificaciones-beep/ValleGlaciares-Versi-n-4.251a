@@ -10,6 +10,7 @@ import { MedioPago, LocalDB, Passenger, VendorKey, VoucherData, BasePasajerosRow
 import { CLP, nowISO } from './utils'
 import { DEFAULT_PASSWORDS, LS_DB, LS_PASSWORDS, VENDORS, loadJSON, saveJSON } from './state'
 import { printVoucher } from './printVoucher'
+import { correoReservaHTML } from './emailTemplates'
 import { dialogStyle, overlayStyle } from './styles'
 import { LS_VISOR_FECHA } from './state'
 import ConfigAvanzadas from './components/ConfigAvanzadas'
@@ -457,31 +458,47 @@ useEffect(() => {
   }
   
   async function ingresarReservaConCorreo(){
-    const errs = validarReservaCompleta()
-    if (errs.length) {
-      alert(`Corrige:\n\n- ${errs.join('\n- ')}`);
-      return
-    }
-
-    // 1) Guardar la reserva como siempre
-    const idCode = pickCodeForCommit(loggedVendor!, db, currentCode)
-    pushBasePasajeros('reserva', idCode)
-    pushBasePagos(idCode)
-    const snap = snapshotVoucher(idCode)
-    pushHistory(idCode, snap)
-    // 2) Preparar datos de correo (silencioso)
-    const firstPassenger = pasajeros[0]
-    const firstName = (firstPassenger?.nombre || '').trim().split(/\s+/)[0] || 'Cliente'
-    const transporteFmt = incluyeTransporte ? 'Incluido' : 'No Incluido'
-    const servicioCM = promoTipo === 'FM' ? 'Full Mármol' : (promoTipo === 'CM' ? 'Capillas de Mármol' : '—')
-  
-  
-    // 3) Confirmación al usuario
-    alert(`Reserva+correo ingresada: ${idCode}\n\nGrupo asignado para la fecha ${fechaLSR || '—'}: ${nextGroupForDate(fechaLSR || '')}`)
-    // 4) Avanzar al siguiente código
-    console.log('Correos encolados en vg_outbox (modo prod/dev).')
-    beginNewSaleWithUniqueCode(loggedVendor!)
+  const errs = validarReservaCompleta()
+  if (errs.length) {
+    alert(`Corrige:\n\n- ${errs.join('\n- ')}`)
+    return
   }
+
+  // 1) Guardar la reserva (igual que antes)
+  const idCode = pickCodeForCommit(loggedVendor!, db, currentCode)
+  pushBasePasajeros('reserva', idCode)
+  pushBasePagos(idCode)
+  const snap = snapshotVoucher(idCode)
+  pushHistory(idCode, snap)
+
+  // 2) Construir correo
+  const primer = snap.pasajeros[0]
+  const to = (primer?.email || '').trim()
+  const subject = `Reserva ${snap.codigo} · Laguna San Rafael`
+  const html = correoReservaHTML(snap)
+
+  // 3) Enviar correo (API Vercel)
+  try {
+    const resp = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ to, subject, html })
+    })
+    const data = await resp.json()
+    if(!resp.ok || !data?.ok){
+      console.error('Error al enviar correo', data)
+      alert(`Reserva ingresada (${idCode}), pero hubo un error enviando el correo.\nPuedes reenviar desde Post-Venta.`)
+    }else{
+      alert(`Reserva ingresada y correo enviado a ${to || 'cliente'}.\nCódigo: ${idCode}\nGrupo ${nextGroupForDate(snap.fechaLSR || '')}`)
+    }
+  } catch (e:any){
+    console.error('Fallo de red/servidor al enviar correo', e)
+    alert(`Reserva ingresada (${idCode}), pero no fue posible contactar el servidor de correo.`)
+  }
+
+  // 4) Avanzar al siguiente código
+  beginNewSaleWithUniqueCode(loggedVendor!)
+}
 
   const onLogout = ()=>{ localStorage.removeItem('vg_vendor'); location.reload() }
 
