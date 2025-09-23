@@ -3,7 +3,7 @@ import { VoucherData } from './types'
 import { CLP } from './utils'
 
 // Ajusta esta URL a tu logo real (PNG/JPG/SVG público)
-const LOGO_URL = 'https://valleglaciares.com/logo.png'
+const LOGO_URL = 'https://valleglaciares.com/wp-content/uploads/2025/08/logo-valleglaciares-vertical-300-ppp.png'
 
 // Fecha "12 de diciembre de 2025" (robusta para YYYY-MM-DD)
 function fechaLarga(fecha?: string){
