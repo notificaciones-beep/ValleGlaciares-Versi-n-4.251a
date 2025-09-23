@@ -474,7 +474,7 @@ useEffect(() => {
   // 2) Construir correo
   const primer = snap.pasajeros[0]
   const to = (primer?.email || '').trim()
-  const subject = `Reserva ${snap.codigo} · Laguna San Rafael`
+  const subject = 'Bienvenido a la Patagonia, tu reserva se ha gestionado con éxito'
   const html = correoReservaHTML(snap)
 
   // 3) Enviar correo (API Vercel)
