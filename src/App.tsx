@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 // Login de SUPABASE (email+contraseña)
 import AuthLogin from './AuthLogin'
-
 // Tu login existente de vendedor (selector con contraseña)
 import VendorLogin from './components/Login'
-
 // Cliente Supabase
 import { supabase } from './supabaseClient'
 import VentaView from './components/VentaView'
