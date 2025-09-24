@@ -169,11 +169,19 @@ function getSeasonFromConfig(dateStr:string, conf:EffectiveConfig): 'alta'|'baja
 
 export default function App(){
   const [user, setUser] = useState<any>(null)
+  const [authReady, setAuthReady] = useState(false)
+  
   useEffect(() => {
-    supabase.auth.getUser().then((res: any) => setUser(res?.data?.user ?? null))
+    supabase.auth.getUser().then((res: any) => {
+      setUser(res?.data?.user ?? null)
+      setAuthReady(true)
+    })
     const { data: sub } = supabase.auth.onAuthStateChange(
-      (_e: unknown, s: any) => setUser(s?.user ?? null)
-      )
+      (_e: unknown, s: any) => {
+        setUser(s?.user ?? null)
+        setAuthReady(true)
+      }
+    )
     return () => { sub.subscription?.unsubscribe?.() }
   }, [])
   const [passwords, setPasswords] = useState<Record<VendorKey,string>>(
@@ -243,18 +251,20 @@ useEffect(() => {
 
 
   // 1) Si NO hay sesión de Supabase, pedir login real (email + contraseña)
+  if (!authReady) {
+    return <div style={{padding:20, fontFamily:'system-ui'}}>Cargando…</div>
+  }
   if (!user) {
     return <AuthLogin />
   }
-  // 2) Si ya hay sesión pero NO hay vendedor elegido, usar tu login con contraseña
   if (!loggedVendor) {
     return (
       <VendorLogin
-      onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
-      getPwd={getPwd}
+        onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
+        getPwd={getPwd}
       />
-      )
-    }
+    )
+  }
 
   function pickCodeForCommit(v: VendorKey, db: LocalDB, current: string) {
     const { nums, start, end, prefix } = usedNumbersForVendor(v, db)
