@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import Login from './components/Login'
+// Login de SUPABASE (email+contraseña)
+import AuthLogin from './AuthLogin'
+
+// Tu login existente de vendedor (selector con contraseña)
+import VendorLogin from './components/Login'
+
+// Cliente Supabase
+import { supabase } from './supabaseClient'
 import VentaView from './components/VentaView'
 import PostVentaPagos from './components/PostVentaPagos'
 import VisorDiario from './components/VisorDiario'
@@ -163,6 +170,12 @@ function getSeasonFromConfig(dateStr:string, conf:EffectiveConfig): 'alta'|'baja
 // pegando antes del componente app
 
 export default function App(){
+  const [user, setUser] = useState<any>(null)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user ?? null))
+    return () => { sub.subscription?.unsubscribe?.() }
+  }, [])
   const [passwords, setPasswords] = useState<Record<VendorKey,string>>(
     loadJSON<Record<VendorKey,string>>(LS_PASSWORDS, DEFAULT_PASSWORDS)
   )
@@ -229,7 +242,19 @@ useEffect(() => {
   }, [])
 
 
-  if(!loggedVendor) return <Login onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }} getPwd={getPwd} />
+  // 1) Si NO hay sesión de Supabase, pedir login real (email + contraseña)
+  if (!user) {
+    return <AuthLogin />
+  }
+  // 2) Si ya hay sesión pero NO hay vendedor elegido, usar tu login con contraseña
+  if (!loggedVendor) {
+    return (
+      <VendorLogin
+      onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
+      getPwd={getPwd}
+      />
+      )
+    }
 
   function pickCodeForCommit(v: VendorKey, db: LocalDB, current: string) {
     const { nums, start, end, prefix } = usedNumbersForVendor(v, db)
@@ -503,7 +528,11 @@ useEffect(() => {
   beginNewSaleWithUniqueCode(loggedVendor!)
 }
 
-  const onLogout = ()=>{ localStorage.removeItem('vg_vendor'); location.reload() }
+  const onLogout = async ()=>{ 
+    localStorage.removeItem('vg_vendor')
+    await supabase.auth.signOut()
+    location.reload()
+  }
 
   function computeSummaryForId(id:string){
     const rows = db.base_pasajeros.filter(r=> r.id===id)
