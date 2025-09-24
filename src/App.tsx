@@ -19,6 +19,7 @@ import { correoReservaHTML } from './emailTemplates'
 import { dialogStyle, overlayStyle } from './styles'
 import { LS_VISOR_FECHA } from './state'
 import ConfigAvanzadas from './components/ConfigAvanzadas'
+import { saveReservaEnBD } from './components/db.js'
 // al inicio:
 import { sendReservationEmails } from './email'
 // === Registry de códigos retirados (no reutilizables) ===
@@ -506,6 +507,19 @@ useEffect(() => {
   pushBasePagos(idCode)
   const snap = snapshotVoucher(idCode)
   pushHistory(idCode, snap)
+
+  // 1.b) Guardar en Supabase
+  try {
+    const { data: { user: u } } = await supabase.auth.getUser()
+  if (!u) {
+    alert('Debes iniciar sesión para guardar la reserva en la base de datos.')
+  } else {
+    await saveReservaEnBD(snap, u.id)
+  }
+} catch (e:any) {
+  console.error('Error al guardar en BD', e)
+  alert('Reserva ingresada, pero no se pudo guardar en la base de datos.')
+}
 
   // 2) Construir correo
   const primer = snap.pasajeros[0]
