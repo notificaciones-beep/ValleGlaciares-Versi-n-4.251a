@@ -170,8 +170,10 @@ function getSeasonFromConfig(dateStr:string, conf:EffectiveConfig): 'alta'|'baja
 export default function App(){
   const [user, setUser] = useState<any>(null)
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user ?? null))
+    supabase.auth.getUser().then((res) => setUser(res.data?.user ?? null))
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_e: unknown, s: any) => setUser(s?.user ?? null)
+      )
     return () => { sub.subscription?.unsubscribe?.() }
   }, [])
   const [passwords, setPasswords] = useState<Record<VendorKey,string>>(
