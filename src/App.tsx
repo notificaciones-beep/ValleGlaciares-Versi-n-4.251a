@@ -482,7 +482,7 @@ useEffect(() => {
   Gracias por su reserva a Laguna San Rafael.
   
   Código: ${idCode}
-  Vendedor: ${VENDORS[loggedVendor!].name}
+  Vendedor: ${getVendorMeta(loggedVendor!).name}
   Fecha LSR: ${fechaLSR || '(por definir)'}
   
   TOTAL COTIZACIÓN: ${CLP(totalCotizacion)}
@@ -770,7 +770,7 @@ useEffect(() => {
       {showSettings && (
         <div style={overlayStyle}><div style={dialogStyle}>
           <h2 style={{marginTop:0}}>Ajustes de usuario</h2>
-          <div style={{color:'#6b7280'}}>Vendedor: <b>{VENDORS[loggedVendor!].name}</b></div>
+          <div style={{color:'#6b7280'}}>Vendedor: <b>{getVendorMeta(loggedVendor!).name}</b></div>
           <div style={{marginTop:10}}>
             <label>Nueva contraseña</label>
             <input type="password" onChange={e=> setPasswords(prev=> ({...prev, [loggedVendor!]: e.target.value || '1234'}))}/>
