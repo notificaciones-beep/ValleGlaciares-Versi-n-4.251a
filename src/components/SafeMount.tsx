@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react'
+// src/components/SafeMount.tsx
+import React from 'react'
 
-/**
- * Evita el error de hooks #310 forzando que el hijo se monte
- * recién en el siguiente tick (luego de un render estable).
- */
 export default function SafeMount({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false)
-  useEffect(() => { setReady(true) }, [])
-  return ready ? <>{children}</> : null
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // ⚠️ IMPORTANTE:
+  // Nunca llames a children como función (nada de children()).
+  // Solo devuélvelo envuelto en un Fragment.
+  if (!mounted) return null
+  return <>{children}</>
 }
