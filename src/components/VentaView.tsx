@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react'
-import { CLP, nInt, getSeason } from '../utils'
+import { CLP, nInt } from '../utils'
 import { MedioPago, Passenger } from '../types'
 
 type Props = {
@@ -114,7 +114,13 @@ export default function VentaView(props:Props){
         {/* LSR */}
         <div style={aquaBlueCard}>
           <div style={pad}>
-            <h2 style={{marginTop:0}}>Laguna San Rafael <span style={{fontSize:12, background:'#eef2ff', padding:'2px 6px', borderRadius:999}}>Temporada: {getSeason(fechaLSR).toUpperCase()}</span></h2>
+            <h2 style={{marginTop:0}}>
+            Laguna San Rafael
+            <span style={{fontSize:12, background:'#eef2ff', padding:'2px 6px', borderRadius:999}}>
+            Temporada: {season.toUpperCase()}
+            </span>
+            </h2>
+
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
               <div>
                 <label>Fecha LSR</label>
