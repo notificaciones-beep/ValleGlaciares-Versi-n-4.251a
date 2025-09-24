@@ -635,7 +635,6 @@ useEffect(() => {
 
       {tab==='venta' ? (
   <ErrorBoundary label="venta">
-    <SafeMount>
       <VentaView
         fechaLSR={fechaLSR} setFechaLSR={setFechaLSR}
         cantAdulto={cantAdulto} setCantAdulto={setCantAdulto}
@@ -673,7 +672,6 @@ useEffect(() => {
         proveedores={effectiveConf.proveedores}
         mediosPago={effectiveConf.mediosPago}
       />
-    </SafeMount>
   </ErrorBoundary>
 ) : tab==='postventa' ? (
   <ErrorBoundary label="postventa">
