@@ -1,6 +1,6 @@
 // src/db.ts
-import { supabase } from '../supabaseClient'
-import type { VoucherData } from '../types'
+import { supabase } from './supabaseClient'
+import type { VoucherData } from './types'
 
 export async function saveReservaEnBD(snap: VoucherData, vendedorUid: string){
   // 1) Inserta la reserva

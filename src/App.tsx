@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 // Login de SUPABASE (email+contraseña)
-import AuthLogin from './components/AuthLogin.js'
+import AuthLogin from './AuthLogin'
 // Tu login existente de vendedor (selector con contraseña)
 import VendorLogin from './components/Login'
 // Cliente Supabase
@@ -19,7 +19,7 @@ import { correoReservaHTML } from './emailTemplates'
 import { dialogStyle, overlayStyle } from './styles'
 import { LS_VISOR_FECHA } from './state'
 import ConfigAvanzadas from './components/ConfigAvanzadas'
-import { saveReservaEnBD } from './components/db.js'
+import { saveReservaEnBD } from './db.js'
 // al inicio:
 import { sendReservationEmails } from './email'
 // === Registry de códigos retirados (no reutilizables) ===
