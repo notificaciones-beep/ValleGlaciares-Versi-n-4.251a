@@ -266,15 +266,15 @@ useEffect(() => {
   
         // Leer reservas con pasajeros y pagos del usuario actual
         const sel = `
-          id, codigo, vendedor_uid, fecha_lsr, valor_transporte, descuento_lsr,
-          capillas_dcto, capillas_valor_total, capillas_tipo, capillas_proveedor, capillas_fecha, created_at,
-          pasajeros ( id, nombre, rut_pasaporte, nacionalidad, telefono, email, categoria ),
-          pagos ( id, medio, monto, comprobante, created_at )
-        `
+        id, codigo, vendedor_uid, fecha_lsr, valor_transporte, descuento_lsr, proveedor,
+        servicio_cm, fecha_cm, valor_cm, descuento_cm, created_at,
+        pasajeros:pasajeros ( id, nombre, rut_pasaporte, nacionalidad, telefono, email, categoria ),
+        pagos:pagos ( id, medio, monto, comprobante, created_at )
+      `
+
         const { data: rs, error } = await supabase
           .from('reservas')
           .select(sel)
-          .eq('vendedor_uid', u.id)
         if (error) { console.error('[VG] leer reservas:', error); return }
   
         // Transformar a la base local (para visores y post-venta)
@@ -310,10 +310,11 @@ useEffect(() => {
               transp_valor: (r.valor_transporte||0) > 0 ? perPersonT : 0,
               lsr_descuento: r.descuento_lsr || 0,
               cm_categoria: '',
-              proveedor: r.capillas_proveedor || '',
-              fecha_cm: r.capillas_fecha || '',
-              cm_valor: 0,
-              cm_descuento: r.capillas_dcto || 0,
+              proveedor: r.proveedor || '',
+              fecha_cm: r.fecha_cm || '',
+              cm_valor: 0,                     // r.valor_cm es total por reserva; dejamos 0 por pasajero
+              cm_descuento: r.descuento_cm || 0,
+ 
               observaciones: '',
               fecha_lsr: r.fecha_lsr || ''
             })
@@ -627,8 +628,10 @@ useEffect(() => {
   }
 } catch (e:any) {
   console.error('Error al guardar en BD', e)
-  alert('Reserva ingresada, pero no se pudo guardar en la base de datos.')
+  const msg = e?.message || e?.error_description || e?.hint || (e?.code ? `Error ${e.code}` : '') || JSON.stringify(e)
+  alert('Reserva ingresada, pero no se pudo guardar en la base de datos.\n\nDetalle: ' + msg)
 }
+
 
   // 2) Construir correo
   const primer = snap.pasajeros[0]
