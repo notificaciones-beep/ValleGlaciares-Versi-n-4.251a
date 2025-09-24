@@ -10,9 +10,18 @@ export default function AuthLogin() {
   const signIn = async (e?: React.FormEvent) => {
     e?.preventDefault?.()
     setMsg(null); setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass })
-    setLoading(false)
-    if (error) setMsg(error.message)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pass })
+      if (error) {
+        setMsg('Credenciales inválidas. Revisa tu email y contraseña.')
+        return
+      }
+      // ok: onAuthStateChange actualizará <App/>
+    } catch (_e) {
+      setMsg('No pudimos contactar al servidor de autenticación. Inténtalo nuevamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const resetPass = async () => {
