@@ -32,17 +32,6 @@ function saveRetired(s: Set<string>) {
   localStorage.setItem(LS_ID_RETIRED, JSON.stringify(Array.from(s)))
 }
 
-useEffect(() => {
-  if (location.search.includes('panic=1')) {
-    try {
-      localStorage.removeItem('vg_vendor')
-      localStorage.removeItem('vg_vendor_overrides')
-      Object.keys(localStorage).filter(k=>/^sb-.*-auth-token$/.test(k)).forEach(k=>localStorage.removeItem(k))
-    } catch {}
-    location.replace(location.origin)
-  }
-}, [])
-
 const LS_VENDOR_OVERRIDES = 'vg_vendor_overrides'
 type VendorOverride = Partial<{ name:string; prefix:string; start:number; end:number }>
 type VendorOverridesMap = Partial<Record<VendorKey, VendorOverride>>
