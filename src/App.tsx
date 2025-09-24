@@ -11,7 +11,7 @@ import VisorDiario from './components/VisorDiario'
 import Modificaciones from './components/Modificaciones'
 import VisorMensual from './components/VisorMensual'
 import BaseDatos from './components/BaseDatos'
-import { MedioPago, LocalDB, Passenger, VendorKey, VoucherData, BasePasajerosRow } from './types'
+import { MedioPago, LocalDB, Passenger, VendorKey, VoucherData, BasePasajerosRow, BasePagosRow } from './types'
 import { CLP, nowISO } from './utils'
 import { DEFAULT_PASSWORDS, LS_DB, LS_PASSWORDS, VENDORS, loadJSON, saveJSON } from './state'
 import { printVoucher } from './printVoucher'
@@ -19,7 +19,7 @@ import { correoReservaHTML } from './emailTemplates'
 import { dialogStyle, overlayStyle } from './styles'
 import { LS_VISOR_FECHA } from './state'
 import ConfigAvanzadas from './components/ConfigAvanzadas'
-import { saveReservaEnBD } from './db'
+import { saveReservaEnBD, savePreReservaEnBD } from './db'
 import ErrorBoundary from './ErrorBoundary'
 // al inicio:
 import { sendReservationEmails } from './email'
@@ -257,6 +257,89 @@ useEffect(() => {
     }
   }, [])
 
+  // === Lectura inicial desde BD (anti-caché) ===
+  useEffect(()=> {
+    (async ()=>{
+      try{
+        const { data: { user: u } } = await supabase.auth.getUser()
+        if(!u) return
+  
+        // Leer reservas con pasajeros y pagos del usuario actual
+        const sel = `
+          id, codigo, vendedor_uid, fecha_lsr, valor_transporte, descuento_lsr,
+          capillas_dcto, capillas_valor_total, capillas_tipo, capillas_proveedor, capillas_fecha, created_at,
+          pasajeros ( id, nombre, rut_pasaporte, nacionalidad, telefono, email, categoria ),
+          pagos ( id, medio, monto, comprobante, created_at )
+        `
+        const { data: rs, error } = await supabase
+          .from('reservas')
+          .select(sel)
+          .eq('vendedor_uid', u.id)
+        if (error) { console.error('[VG] leer reservas:', error); return }
+  
+        // Transformar a la base local (para visores y post-venta)
+        const base_pasajeros: BasePasajerosRow[] = []
+        const base_pagos: BasePagosRow[] = []
+  
+        for (const r of (rs||[])) {
+          // Temporada para esa fecha (usa config actual)
+          const seasonR = getSeasonFromConfig(r.fecha_lsr || '', effectiveConf)
+          const lsrRates = (effectiveConf.ratesLSR as any)[seasonR] || { adulto:0, nino:0, infante:0 }
+          const perPersonT = (effectiveConf.transport as any)[seasonR] || 0
+  
+          // Pasajeros
+          for (const p of (r.pasajeros||[])) {
+            const lsr_valor =
+              p.categoria==='adulto' ? lsrRates.adulto :
+              p.categoria==='nino'   ? lsrRates.nino   :
+                                       lsrRates.infante
+            base_pasajeros.push({
+              createdAt: r.created_at || nowISO(),
+              estado: 'reserva',
+              vendedor: '(BD)',   // nombre amigable opcional; podemos mapearlo luego
+              id: r.codigo,
+              ng: '',             // grupo no persistido: lo dejamos vacío
+              nombre: p.nombre || '',
+              doc: p.rut_pasaporte || '',
+              nacionalidad: p.nacionalidad || '',
+              telefono: p.telefono || '',
+              email: p.email || '',
+              lsr_categoria: p.categoria,
+              transporte: (r.valor_transporte||0) > 0 ? 'si' : 'no',
+              lsr_valor,
+              transp_valor: (r.valor_transporte||0) > 0 ? perPersonT : 0,
+              lsr_descuento: r.descuento_lsr || 0,
+              cm_categoria: '',
+              proveedor: r.capillas_proveedor || '',
+              fecha_cm: r.capillas_fecha || '',
+              cm_valor: 0,
+              cm_descuento: r.capillas_dcto || 0,
+              observaciones: '',
+              fecha_lsr: r.fecha_lsr || ''
+            })
+          }
+  
+          // Pagos
+          for (const pg of (r.pagos||[])) {
+            base_pagos.push({
+              createdAt: pg.created_at || nowISO(),
+              vendedor: '(BD)',
+              id: r.codigo,
+              medio: pg.medio || '',
+              monto: pg.monto || 0,
+              comprobante: pg.comprobante || ''
+            })
+          }
+        }
+  
+        // Cargar en el estado local de la app
+        setDb(prev => ({ ...prev, base_pasajeros, base_pagos }))
+      } catch(e){
+        console.error('[VG] sync inicial BD', e)
+      }
+    })()
+  }, [authReady, user?.id, loggedVendor, effectiveConf])
+
 
   // 1) Si NO hay sesión de Supabase, pedir login real (email + contraseña)
   console.log('[VG] authReady=', authReady, ' user=', !!user, ' loggedVendor=', loggedVendor)
@@ -462,7 +545,7 @@ useEffect(() => {
   }
   
 
-  function ingresarPreReserva(){
+  async function ingresarPreReserva(){
     if(!fechaLSR){ alert('Debes indicar Fecha LSR para asignar el grupo.'); return }
     if((totalPersonas||0) <= 0){ alert('Debes ingresar al menos 1 pasajero.'); return }
   
@@ -471,7 +554,23 @@ useEffect(() => {
     pushBasePasajeros('pre-reserva', idCode)
     pushBasePagos(idCode)
     const snap = snapshotVoucher(idCode); pushHistory(idCode, snap)
-  
+    // === Persistir en BD la PRE-RESERVA ===
+    try{
+      const { data: { user: u } } = await supabase.auth.getUser()
+      if (!u) throw new Error('Sin sesión de Supabase')
+      await savePreReservaEnBD({
+        codigo: idCode,
+        fecha_lsr: fechaLSR || null,
+        cant_adulto: cantAdulto,
+        cant_nino: cantNino,
+        cant_infante: cantInfante,
+        incluye_transporte: incluyeTransporte,
+      }, u.id)
+    } catch(e:any){
+      console.error('[VG] pre-reserva BD', e)
+      alert('Pre-reserva ingresada, pero no se pudo guardar en la base de datos.')
+    }
+
     alert(`Pre-reserva ingresada: ${idCode}\n\nGrupo asignado para ${fechaLSR}: ${nextGroupForDate(fechaLSR)}`)
     beginNewSaleWithUniqueCode(loggedVendor!)
   }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { BasePagosRow, LocalDB, MedioPago } from '../types'
 import { CLP, nowISO } from '../utils'
+import { supabase } from '../supabaseClient'
 
 export default function PostVentaPagos(
   {db, onAddPago, vendedorActual, computeSummaryForId, initialId, onConsumedInitial, mediosPago} : {
@@ -35,7 +36,7 @@ export default function PostVentaPagos(
     if(!s){ alert('No se encuentra ese ID en base de pasajeros.'); setFound(null); return }
     setFound(s)
   }
-  function agregarMovimiento(){
+  async function agregarMovimiento(){
     if(!found){ alert('Busca y selecciona un ID primero.'); return }
     if(!Number.isFinite(monto) || monto===0){
       alert('Ingresa un monto distinto de 0. Para reembolso usa monto negativo.'); return
@@ -45,6 +46,30 @@ export default function PostVentaPagos(
       vendedor: vendedorActual,
       id: found.id,
       medio, monto, comprobante: comprobante || ''
+    }
+    // === Persistir pago en Supabase ===
+    try{
+      const { data: { user: u } } = await supabase.auth.getUser()
+      if(!u) throw new Error('Sin sesión (Supabase)')
+    
+      // Buscar la reserva por su código escrito (found.id)
+      const { data: rsv, error: e1 } = await supabase
+        .from('reservas')
+        .select('id')
+        .eq('codigo', found.id)
+        .maybeSingle()
+      if (e1 || !rsv?.id) { alert('No se encontró esa reserva en la BD. ¿La creaste con “Ingresar reserva + correo”?'); return }
+    
+      const { error: e2 } = await supabase.from('pagos').insert({
+        reserva_id: rsv.id,
+        vendedor_uid: u.id,
+        medio, monto,
+        comprobante: comprobante || null
+      })
+      if (e2) throw e2
+    } catch(e:any){
+      alert('No se pudo guardar el pago en la BD: ' + (e?.message || e))
+      return
     }
     onAddPago(row)
     setMonto(0); setComprobante('')

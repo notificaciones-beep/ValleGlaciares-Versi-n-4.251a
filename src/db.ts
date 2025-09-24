@@ -62,3 +62,25 @@ export async function saveReservaEnBD(snap: VoucherData, vendedorUid: string){
 
   return reservaId
 }
+ // === Helpers adicionales de persistencia ===
+
+// Pre-reserva ligera (botón "Ingresar pre-reserva")
+export async function savePreReservaEnBD(pr: {
+  codigo: string;
+  fecha_lsr?: string | null;
+  cant_adulto: number;
+  cant_nino: number;
+  cant_infante: number;
+  incluye_transporte: boolean;
+}, vendedorUid: string) {
+  const { error } = await supabase.from('prereservas').insert({
+    codigo: pr.codigo,
+    vendedor_uid: vendedorUid,
+    fecha_lsr: pr.fecha_lsr ?? null,
+    cant_adulto: pr.cant_adulto,
+    cant_nino: pr.cant_nino,
+    cant_infante: pr.cant_infante,
+    incluye_transporte: pr.incluye_transporte,
+  })
+  if (error) throw error
+}

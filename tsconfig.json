@@ -11,7 +11,18 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "types": ["vite/client", "@vercel/node", "node"]
+    "types": ["vite/client", "@vercel/node", "node"],
+    "baseUrl": "."
   },
-  "include": ["src", "api"]
+  "include": [
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+    "./api/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/ValleGlaciares-Versi-n-*/**",
+    "**/ValleGlaciares-Version*/**"
+  ]
 }
