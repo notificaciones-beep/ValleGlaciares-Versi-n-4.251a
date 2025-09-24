@@ -260,20 +260,21 @@ useEffect(() => {
 
   // 1) Si NO hay sesión de Supabase, pedir login real (email + contraseña)
   console.log('[VG] authReady=', authReady, ' user=', !!user, ' loggedVendor=', loggedVendor)
-  if (!authReady) {
-    return <div style={{padding:20, fontFamily:'system-ui'}}>Cargando…</div>
-  }
-  if (!user) {
-    return <AuthLogin />
-  }
-  if (!loggedVendor) {
-    return (
-      <VendorLogin
-      onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
-      getPwd={getPwd}
-      />
-      )
-    }
+  // En lugar de "returns" tempranos, definimos qué pantalla mostrar
+  const gate = !authReady
+  ? <div style={{padding:20, fontFamily:'system-ui'}}>Cargando…</div>
+  : (!user
+      ? <AuthLogin />
+      : (!loggedVendor
+          ? (
+            <VendorLogin
+              onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
+              getPwd={getPwd}
+            />
+          )
+          : null
+        )
+    );
 
 
   function pickCodeForCommit(v: VendorKey, db: LocalDB, current: string) {
@@ -608,7 +609,7 @@ useEffect(() => {
   }, [loggedVendor, db.base_pasajeros, db.base_pagos, db.history])
   
 
-  return (
+  return gate ? (gate) : (
     <div style={{padding:16, maxWidth: '100%', margin:'0 auto'}}>
       <div style={{display:'flex', gap:12, alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
         <div style={{color:'#4b5563', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
