@@ -37,18 +37,24 @@ type VendorOverride = Partial<{ name:string; prefix:string; start:number; end:nu
 type VendorOverridesMap = Partial<Record<VendorKey, VendorOverride>>
 
 function getVendorMeta(v: VendorKey | string){
-  const raw = localStorage.getItem(LS_VENDOR_OVERRIDES)
-  const overrides = raw ? JSON.parse(raw) as (VendorOverridesMap & Record<string, VendorOverride>) : {}
+  // Leer overrides con try/catch: si hay basura en localStorage no rompemos la app
+  let overrides: (VendorOverridesMap & Record<string, VendorOverride>) = {}
+  try {
+    const raw = localStorage.getItem(LS_VENDOR_OVERRIDES)
+    overrides = raw ? (JSON.parse(raw) || {}) : {}
+  } catch {
+    overrides = {}
+  }
 
-  // (3) Renombrar "javier" → "Admin" por defecto sin tocar la base
+  // Renombrar "javier" → "Admin" por defecto sin tocar la base
   if (!overrides['javier']) overrides['javier'] = { name: 'Admin' }
 
   const base = (VENDORS as any)[v]
   const ov = overrides[v as keyof typeof overrides] || {}
 
+  // Si existe en VENDORS, fusionar; si no, crear uno “virtual” con los overrides o defaults
   if (base) return { ...base, ...ov }
 
-  // (1) Soportar usuarios NUEVOS creados desde Config Avanzadas (no existen en VENDORS)
   return {
     name: ov.name || String(v),
     prefix: ov.prefix || String(v).charAt(0).toUpperCase(),
