@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 // Login de SUPABASE (email+contraseña)
-import AuthLogin from './AuthLogin'
+import AuthLogin from './components/AuthLogin.js'
 // Tu login existente de vendedor (selector con contraseña)
 import VendorLogin from './components/Login'
 // Cliente Supabase
@@ -170,7 +170,7 @@ function getSeasonFromConfig(dateStr:string, conf:EffectiveConfig): 'alta'|'baja
 export default function App(){
   const [user, setUser] = useState<any>(null)
   useEffect(() => {
-    supabase.auth.getUser().then((res) => setUser(res.data?.user ?? null))
+    supabase.auth.getUser().then((res: any) => setUser(res?.data?.user ?? null))
     const { data: sub } = supabase.auth.onAuthStateChange(
       (_e: unknown, s: any) => setUser(s?.user ?? null)
       )

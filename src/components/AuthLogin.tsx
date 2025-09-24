@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from './supabaseClient'
+import { supabase } from '../supabaseClient'
 
 export default function AuthLogin() {
   const [email, setEmail] = useState('')
@@ -32,39 +32,21 @@ export default function AuthLogin() {
         <h2 style={{margin:'0 0 12px 0', color:'#0c3946'}}>Acceder a Valle Glaciares</h2>
 
         <label style={{display:'block', fontSize:13}}>Email</label>
-        <input
-          value={email}
-          onChange={e=>setEmail(e.target.value)}
-          type="email"
-          required
-          placeholder="tucorreo@ejemplo.com"
-          style={{width:'100%', margin:'6px 0 12px 0', padding:10, borderRadius:8, border:'1px solid #cbd5e1'}}
-        />
+        <input value={email} onChange={e=>setEmail(e.target.value)} type="email" required placeholder="tucorreo@ejemplo.com"
+          style={{width:'100%', margin:'6px 0 12px 0', padding:10, borderRadius:8, border:'1px solid #cbd5e1'}} />
 
         <label style={{display:'block', fontSize:13}}>Contraseña</label>
-        <input
-          value={pass}
-          onChange={e=>setPass(e.target.value)}
-          type="password"
-          required
-          placeholder="••••••••"
-          style={{width:'100%', margin:'6px 0 16px 0', padding:10, borderRadius:8, border:'1px solid #cbd5e1'}}
-        />
+        <input value={pass} onChange={e=>setPass(e.target.value)} type="password" required placeholder="••••••••"
+          style={{width:'100%', margin:'6px 0 16px 0', padding:10, borderRadius:8, border:'1px solid #cbd5e1'}} />
 
-        <button
-          disabled={loading}
-          type="submit"
-          style={{width:'100%', padding:'10px 14px', borderRadius:10, background:'#0c3946', color:'#fff', fontWeight:700}}
-        >
+        <button disabled={loading} type="submit"
+          style={{width:'100%', padding:'10px 14px', borderRadius:10, background:'#0c3946', color:'#fff', fontWeight:700}}>
           {loading ? 'Ingresando…' : 'Ingresar'}
         </button>
 
         <div style={{marginTop:10, textAlign:'center'}}>
-          <button
-            type="button"
-            onClick={resetPass}
-            style={{background:'transparent', border:0, color:'#0c3946', textDecoration:'underline', cursor:'pointer'}}
-          >
+          <button type="button" onClick={resetPass}
+            style={{background:'transparent', border:0, color:'#0c3946', textDecoration:'underline', cursor:'pointer'}}>
             Recuperar contraseña
           </button>
         </div>
