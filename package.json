@@ -17,10 +17,11 @@
   "devDependencies": {
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "@types/node": "^24.5.2",
-    "@vercel/node": "^5.3.24",
+    "@types/node": "^20.14.2",
+    "@vercel/node": "^3.2.0",
+    "@types/nodemailer": "^6.4.15",
     "typescript": "^5.4.5",
-    "vite": "^7.1.7",
+    "vite": "^5.2.0",
     "@vitejs/plugin-react": "^4.2.0"
   }
 }
