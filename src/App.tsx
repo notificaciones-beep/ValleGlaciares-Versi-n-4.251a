@@ -19,7 +19,7 @@ import { correoReservaHTML } from './emailTemplates'
 import { dialogStyle, overlayStyle } from './styles'
 import { LS_VISOR_FECHA } from './state'
 import ConfigAvanzadas from './components/ConfigAvanzadas'
-import { saveReservaEnBD } from './db.js'
+import { saveReservaEnBD } from './db'
 // al inicio:
 import { sendReservationEmails } from './email'
 // === Registry de códigos retirados (no reutilizables) ===
@@ -252,6 +252,7 @@ useEffect(() => {
 
 
   // 1) Si NO hay sesión de Supabase, pedir login real (email + contraseña)
+  console.log('[VG] authReady=', authReady, ' user=', !!user, ' loggedVendor=', loggedVendor)
   if (!authReady) {
     return <div style={{padding:20, fontFamily:'system-ui'}}>Cargando…</div>
   }
@@ -261,11 +262,12 @@ useEffect(() => {
   if (!loggedVendor) {
     return (
       <VendorLogin
-        onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
-        getPwd={getPwd}
+      onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
+      getPwd={getPwd}
       />
-    )
-  }
+      )
+    }
+
 
   function pickCodeForCommit(v: VendorKey, db: LocalDB, current: string) {
     const { nums, start, end, prefix } = usedNumbersForVendor(v, db)

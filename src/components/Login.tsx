@@ -5,8 +5,13 @@ import { DEFAULT_PASSWORDS, VENDORS } from '../state'
 const LS_VENDOR_OVERRIDES = 'vg_vendor_overrides'
 function getEffectiveVendors(){
   const raw = localStorage.getItem(LS_VENDOR_OVERRIDES)
-  const overrides = raw ? JSON.parse(raw) as Record<string, Partial<{ name:string; prefix:string; start:number; end:number }>> : {}
-
+  let overrides: Record<string, Partial<{ name:string; prefix:string; start:number; end:number }>> = {}
+  try {
+    overrides = raw ? (JSON.parse(raw) || {}) : {}
+  } catch {
+    // si hay basura en localStorage, ignoramos y seguimos con {}
+    overrides = {}
+  }
   // Base: SOLO 'javier' (que mostraremos como Admin por defecto)
   const merged: Record<string, { name:string; prefix:string; start:number; end:number }> = {} as any
   if ((VENDORS as any)['javier']) {
@@ -25,7 +30,11 @@ function getEffectiveVendors(){
 
 
 export default function Login({onLogin, getPwd}:{onLogin:(v:string)=>void, getPwd:(v:string)=>string}){
-  const [vendor, setVendor] = useState<string>('javier')
+  const initialVendor = (() => {
+    const keys = Object.keys(getEffectiveVendors())
+    return keys[0] || 'javier'
+  })()
+  const [vendor, setVendor] = useState<string>(initialVendor)
   const [pwd, setPwd] = useState('')
   const [err, setErr] = useState('')
 
