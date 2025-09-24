@@ -20,6 +20,7 @@ import { dialogStyle, overlayStyle } from './styles'
 import { LS_VISOR_FECHA } from './state'
 import ConfigAvanzadas from './components/ConfigAvanzadas'
 import { saveReservaEnBD } from './db'
+import ErrorBoundary from './ErrorBoundary'
 // al inicio:
 import { sendReservationEmails } from './email'
 import SafeMount from './components/SafeMount'  // ⬅️ agrega este import
@@ -633,84 +634,110 @@ useEffect(() => {
       
 
       {tab==='venta' ? (
-        <SafeMount><VentaView
-          fechaLSR={fechaLSR} setFechaLSR={setFechaLSR}
-          cantAdulto={cantAdulto} setCantAdulto={setCantAdulto}
-          cantNino={cantNino} setCantNino={setCantNino}
-          cantInfante={cantInfante} setCantInfante={setCantInfante}
-          descuentoLSR={descuentoLSR} setDescuentoLSR={setDescuentoLSR}
-          incluyeTransporte={incluyeTransporte} setIncluyeTransporte={setIncluyeTransporte}
-          promoTipo={promoTipo} setPromoTipo={setPromoTipo}
-          fechaPromo={fechaPromo} setFechaPromo={setFechaPromo}
-          proveedor={proveedor} setProveedor={setProveedor}
-          descuentoPromo={descuentoPromo} setDescuentoPromo={setDescuentoPromo}
-          payments={payments} setPayments={setPayments}
-          observaciones={observaciones} setObservaciones={setObservaciones}
-          pasajeros={pasajeros} setPasajeros={setPasajeros}
-          totalPersonas={totalPersonas}
-          season={season as any}
-          snapshotVoucher={() => snapshotVoucher(currentCode)}
-          ingresarPreReserva={ingresarPreReserva}
-          ingresarReserva={ingresarReserva}
-          ingresarReservaConCorreo={ingresarReservaConCorreo}
-          totalPagado={totalPagado}
-          lsrSubtotal={lsrSubtotal}
-          transporteTotal={transporteTotal}
-          lsrDctoAplicado={lsrDctoAplicado}
-          totalLSRConTransporte={totalLSRConTransporte}
-          promoSubtotal={promoSubtotal}
-          promoDctoAplicado={promoDctoAplicado}
-          promoTotal={promoTotal}
-          totalCotizacion={totalCotizacion}
-          saldo={saldo}
-          ngPreview={ngPreview}
-          ratesLSR={effectiveConf.ratesLSR}
-          transportPerPerson={(effectiveConf.transport as any)[season]}
-          openClearConfirm={()=> setShowClearConfirm(true)}
-          proveedores={effectiveConf.proveedores}
-          mediosPago={effectiveConf.mediosPago}
-
-          /></SafeMount>
-      ) : tab==='postventa' ? (
-        <SafeMount><PostVentaPagos
-          db={db}
-          onAddPago={(row)=> setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, row]}))}
-          vendedorActual={getVendorMeta(loggedVendor!).name}
-          computeSummaryForId={computeSummaryForId}
-          initialId={postVentaInitialId}
-          onConsumedInitial={()=> setPostVentaInitialId('')}
-          mediosPago={effectiveConf.mediosPago}
-
-          /></SafeMount>
-        ) : tab==='visor' ? (
-          <SafeMount><VisorDiario
-            db={db}
-            computeSummaryForId={computeSummaryForId}
-            onClickId={(id)=> setIdAction({open:true, id})}
-            /></SafeMount>
-        ) : tab==='mensual' ? (
-          <SafeMount><VisorMensual
-          db={db}
-          onGoToVisorDiario={goToVisorDiarioWithDate}
-          /></SafeMount>         
-        ) : tab==='mod' ? (
-          <SafeMount><Modificaciones
-            db={db}
-            setDb={setDb}
-            vendedorActual={getVendorMeta(loggedVendor!).name}
-            initialId={modInitialId}
-            onConsumedInitial={()=> setModInitialId('')}
-            ratesLSR={effectiveConf.ratesLSR}
-            ratesPromo={effectiveConf.ratesPromo}
-            transportPerPerson={(effectiveConf.transport as any)['alta']} // NO: ver nota abajo
-            getSeasonFn={(d)=> getSeasonFromConfig(d, effectiveConf)}
-            proveedores={effectiveConf.proveedores}
-            /></SafeMount>
-        ) : tab==='admin' ? (
-          <SafeMount><ConfigAvanzadas /></SafeMount>
-          ) : (
-            <SafeMount><BaseDatos db={db} /></SafeMount>
-      )}
+  <ErrorBoundary label="venta">
+    <SafeMount>
+      <VentaView
+        fechaLSR={fechaLSR} setFechaLSR={setFechaLSR}
+        cantAdulto={cantAdulto} setCantAdulto={setCantAdulto}
+        cantNino={cantNino} setCantNino={setCantNino}
+        cantInfante={cantInfante} setCantInfante={setCantInfante}
+        descuentoLSR={descuentoLSR} setDescuentoLSR={setDescuentoLSR}
+        incluyeTransporte={incluyeTransporte} setIncluyeTransporte={setIncluyeTransporte}
+        promoTipo={promoTipo} setPromoTipo={setPromoTipo}
+        fechaPromo={fechaPromo} setFechaPromo={setFechaPromo}
+        proveedor={proveedor} setProveedor={setProveedor}
+        descuentoPromo={descuentoPromo} setDescuentoPromo={setDescuentoPromo}
+        payments={payments} setPayments={setPayments}
+        observaciones={observaciones} setObservaciones={setObservaciones}
+        pasajeros={pasajeros} setPasajeros={setPasajeros}
+        totalPersonas={totalPersonas}
+        season={season as any}
+        snapshotVoucher={() => snapshotVoucher(currentCode)}
+        ingresarPreReserva={ingresarPreReserva}
+        ingresarReserva={ingresarReserva}
+        ingresarReservaConCorreo={ingresarReservaConCorreo}
+        totalPagado={totalPagado}
+        lsrSubtotal={lsrSubtotal}
+        transporteTotal={transporteTotal}
+        lsrDctoAplicado={lsrDctoAplicado}
+        totalLSRConTransporte={totalLSRConTransporte}
+        promoSubtotal={promoSubtotal}
+        promoDctoAplicado={promoDctoAplicado}
+        promoTotal={promoTotal}
+        totalCotizacion={totalCotizacion}
+        saldo={saldo}
+        ngPreview={ngPreview}
+        ratesLSR={effectiveConf.ratesLSR}
+        transportPerPerson={(effectiveConf.transport as any)[season]}
+        openClearConfirm={()=> setShowClearConfirm(true)}
+        proveedores={effectiveConf.proveedores}
+        mediosPago={effectiveConf.mediosPago}
+      />
+    </SafeMount>
+  </ErrorBoundary>
+) : tab==='postventa' ? (
+  <ErrorBoundary label="postventa">
+    <SafeMount>
+      <PostVentaPagos
+        db={db}
+        onAddPago={(row)=> setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, row]}))}
+        vendedorActual={getVendorMeta(loggedVendor!).name}
+        computeSummaryForId={computeSummaryForId}
+        initialId={postVentaInitialId}
+        onConsumedInitial={()=> setPostVentaInitialId('')}
+        mediosPago={effectiveConf.mediosPago}
+      />
+    </SafeMount>
+  </ErrorBoundary>
+) : tab==='visor' ? (
+  <ErrorBoundary label="visor-diario">
+    <SafeMount>
+      <VisorDiario
+        db={db}
+        computeSummaryForId={computeSummaryForId}
+        onClickId={(id)=> setIdAction({open:true, id})}
+      />
+    </SafeMount>
+  </ErrorBoundary>
+) : tab==='mensual' ? (
+  <ErrorBoundary label="visor-mensual">
+    <SafeMount>
+      <VisorMensual
+        db={db}
+        onGoToVisorDiario={goToVisorDiarioWithDate}
+      />
+    </SafeMount>
+  </ErrorBoundary>
+) : tab==='mod' ? (
+  <ErrorBoundary label="modificaciones">
+    <SafeMount>
+      <Modificaciones
+        db={db}
+        setDb={setDb}
+        vendedorActual={getVendorMeta(loggedVendor!).name}
+        initialId={modInitialId}
+        onConsumedInitial={()=> setModInitialId('')}
+        ratesLSR={effectiveConf.ratesLSR}
+        ratesPromo={effectiveConf.ratesPromo}
+        transportPerPerson={(effectiveConf.transport as any)['alta']}
+        getSeasonFn={(d)=> getSeasonFromConfig(d, effectiveConf)}
+        proveedores={effectiveConf.proveedores}
+      />
+    </SafeMount>
+  </ErrorBoundary>
+) : tab==='admin' ? (
+  <ErrorBoundary label="config-avanzadas">
+    <SafeMount>
+      <ConfigAvanzadas />
+    </SafeMount>
+  </ErrorBoundary>
+) : (
+  <ErrorBoundary label="base-datos">
+    <SafeMount>
+      <BaseDatos db={db} />
+    </SafeMount>
+  </ErrorBoundary>
+)}
       {showClearConfirm && (
         <div style={overlayStyle}><div style={dialogStyle}>
           <h2 style={{marginTop:0}}>Limpiar formulario</h2>
