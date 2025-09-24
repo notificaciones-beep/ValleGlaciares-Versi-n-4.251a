@@ -22,6 +22,7 @@ import ConfigAvanzadas from './components/ConfigAvanzadas'
 import { saveReservaEnBD } from './db'
 // al inicio:
 import { sendReservationEmails } from './email'
+import SafeMount from './components/SafeMount'  // ⬅️ agrega este import
 // === Registry de códigos retirados (no reutilizables) ===
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
 
@@ -629,9 +630,10 @@ useEffect(() => {
            <button onClick={()=>setTab('admin')} style={{fontWeight: tab==='admin'?700:400}}>Configuraciones avanzadas</button>
            )}
       </div>
+      
 
       {tab==='venta' ? (
-        <VentaView
+        <SafeMount><VentaView
           fechaLSR={fechaLSR} setFechaLSR={setFechaLSR}
           cantAdulto={cantAdulto} setCantAdulto={setCantAdulto}
           cantNino={cantNino} setCantNino={setCantNino}
@@ -668,9 +670,9 @@ useEffect(() => {
           proveedores={effectiveConf.proveedores}
           mediosPago={effectiveConf.mediosPago}
 
-        />
+          /></SafeMount>
       ) : tab==='postventa' ? (
-        <PostVentaPagos
+        <SafeMount><PostVentaPagos
           db={db}
           onAddPago={(row)=> setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, row]}))}
           vendedorActual={getVendorMeta(loggedVendor!).name}
@@ -679,20 +681,20 @@ useEffect(() => {
           onConsumedInitial={()=> setPostVentaInitialId('')}
           mediosPago={effectiveConf.mediosPago}
 
-        />
+          /></SafeMount>
         ) : tab==='visor' ? (
-          <VisorDiario
+          <SafeMount><VisorDiario
             db={db}
             computeSummaryForId={computeSummaryForId}
             onClickId={(id)=> setIdAction({open:true, id})}
-          />
+            /></SafeMount>
         ) : tab==='mensual' ? (
-          <VisorMensual
+          <SafeMount><VisorMensual
           db={db}
           onGoToVisorDiario={goToVisorDiarioWithDate}
-          />          
+          /></SafeMount>         
         ) : tab==='mod' ? (
-          <Modificaciones
+          <SafeMount><Modificaciones
             db={db}
             setDb={setDb}
             vendedorActual={getVendorMeta(loggedVendor!).name}
@@ -703,13 +705,11 @@ useEffect(() => {
             transportPerPerson={(effectiveConf.transport as any)['alta']} // NO: ver nota abajo
             getSeasonFn={(d)=> getSeasonFromConfig(d, effectiveConf)}
             proveedores={effectiveConf.proveedores}
-          />
+            /></SafeMount>
         ) : tab==='admin' ? (
-          <ConfigAvanzadas 
-          />
-        ) : (
-          <BaseDatos db={db}
-          />
+          <SafeMount><ConfigAvanzadas /></SafeMount>
+          ) : (
+            <SafeMount><BaseDatos db={db} /></SafeMount>
       )}
       {showClearConfirm && (
         <div style={overlayStyle}><div style={dialogStyle}>
