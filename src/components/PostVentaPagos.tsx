@@ -62,7 +62,6 @@ export default function PostVentaPagos(
     
       const { error: e2 } = await supabase.from('pagos').insert({
         reserva_id: rsv.id,
-        vendedor_uid: u.id,
         medio, monto,
         comprobante: comprobante || null
       })
