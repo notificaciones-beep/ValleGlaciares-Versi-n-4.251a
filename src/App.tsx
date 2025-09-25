@@ -26,7 +26,7 @@ import { sendReservationEmails } from './email'
 import SafeMount from './components/SafeMount'  // ⬅️ agrega este import
 // === Registry de códigos retirados (no reutilizables) ===
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
-const [refreshTick, setRefreshTick] = useState(0)
+
 
 function safeYYYYMMDD(d?: string | null): string | null {
   if (!d) return null
@@ -197,6 +197,16 @@ export default function App(){
         setAuthReady(true)
       }
     )
+    useEffect(() => {
+      if (!authReady) return
+      const ch = supabase.channel('db-updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas'  }, () => setRefreshTick(t => t + 1))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pasajeros' }, () => setRefreshTick(t => t + 1))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos'     }, () => setRefreshTick(t => t + 1))
+        .subscribe()
+      return () => { try { supabase.removeChannel(ch) } catch {} }
+    }, [authReady])
+    
     return () => { sub.subscription?.unsubscribe?.() }
   }, [])
   const [passwords, setPasswords] = useState<Record<VendorKey,string>>(
@@ -249,7 +259,7 @@ useEffect(() => {
   const [fechaPromo, setFechaPromo] = useState('')
   const [proveedor, setProveedor] = useState<string|undefined>(undefined)
   const [descuentoPromo, setDescuentoPromo] = useState(0)
-
+  const [refreshTick, setRefreshTick] = useState(0)
   const [payments, setPayments] = useState<{ medio:MedioPago, monto:number, comprobante?:string }[]>([{ medio:'efectivo', monto:0, comprobante:'' }])
   const [observaciones, setObservaciones] = useState('')
   const [pasajeros, setPasajeros] = useState<Passenger[]>([])
@@ -330,6 +340,8 @@ useEffect(() => {
 
         // NG por fecha: orden estable (created_at, luego codigo)
         const codesByDate = new Map<string, {code:string, created:string}[]>()
+        // NG por fecha: orden estable (created_at, luego código)
+          
         for (const r of (rs || [])) {
           if (!r.fecha_lsr) continue
           const arr = codesByDate.get(r.fecha_lsr) || []
@@ -716,6 +728,7 @@ useEffect(() => {
         alert('Debes iniciar sesión para guardar la reserva en la base de datos.')
       } else {
         await saveReservaEnBD(snap, u.id)
+        setRefreshTick(t => t + 1) // ← fuerza refresh inmediato
       }
     } catch (e:any) {
       console.error('Error al guardar en BD', e)
