@@ -293,9 +293,9 @@ useEffect(() => {
   
         // 3) Leer PAGOS de esas reservas
         const { data: pg, error: eG } = await supabase
-          .from('pagos')
-          .select('id,reserva_id,medio,monto,comprobante,created_at')
-          .in('reserva_id', ids)
+        .from('pagos')
+        .select('id,reserva_id,medio,monto,created_at') // ← sin 'comprobante' para que nunca rompa
+        .in('reserva_id', ids)
         if (eG) {
           console.error('[VG] leer pagos:', eG)
           alert('No se pudieron leer pagos: ' + (eG.message || JSON.stringify(eG)))
@@ -365,7 +365,7 @@ useEffect(() => {
               id: r.codigo,
               medio: p.medio || '',
               monto: p.monto || 0,
-              comprobante: p.comprobante || ''
+              comprobante: (p as any).comprobante || ''
             })
           }
         }
