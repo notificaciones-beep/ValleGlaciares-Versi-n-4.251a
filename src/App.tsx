@@ -229,6 +229,7 @@ useEffect(() => {
 
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showConfirmReserva, setShowConfirmReserva] = useState(false)
   const [tab, setTab] = useState<'venta'|'postventa'|'visor'|'mensual'|'mod'|'base'|'admin'>('venta')
 
   const [idAction, setIdAction] = useState<{open:boolean,id:string}|null>(null)
@@ -652,74 +653,69 @@ useEffect(() => {
   }
   
   async function ingresarReservaConCorreo(){
-  const errs = validarReservaCompleta()
-  if (errs.length) {
-    alert(`Corrige:\n\n- ${errs.join('\n- ')}`)
-    return
+    setShowConfirmReserva(true)  // solo abre el modal
   }
 
-  // 1) Guardar la reserva (igual que antes)
-  const idCode = pickCodeForCommit(loggedVendor!, db, currentCode)
-  pushBasePasajeros('reserva', idCode)
-  pushBasePagos(idCode)
-  const snap = snapshotVoucher(idCode)
-  pushHistory(idCode, snap)
-
-  // 1.b) Guardar en Supabase
-  try {
-    const { data: { user: u } } = await supabase.auth.getUser()
-  if (!u) {
-    alert('Debes iniciar sesión para guardar la reserva en la base de datos.')
-  } else {
-    await saveReservaEnBD(snap, u.id)
-  }
-} catch (e:any) {
-  console.error('Error al guardar en BD', e)
-  const msg = e?.message || e?.error_description || e?.hint || (e?.code ? `Error ${e.code}` : '') || JSON.stringify(e)
-  alert('Reserva ingresada, pero no se pudo guardar en la base de datos.\n\nDetalle: ' + msg)
-}
-
-// 2) Confirmar si deseas enviar el correo al cliente ahora
-const enviarCorreo = window.confirm(
-  '¿Deseas enviar el correo con el resumen de compra ahora?\n\n' +
-  'Aceptar: Enviar correo\nCancelar: NO enviar ahora'
-)
-if (!enviarCorreo) {
-  alert(`Reserva ingresada. Código: ${idCode}.\nNo se envió el correo en este momento.`)
-  // 4) Avanzar al siguiente código
-  beginNewSaleWithUniqueCode(loggedVendor!)
-  return
-}
-  // 2) Construir correo
-  const primer = snap.pasajeros[0]
-  const to = (primer?.email || '').trim()
-  const subject = 'Bienvenido a la Patagonia, tu reserva se ha gestionado con éxito'
-  const html = correoReservaHTML(snap)
-
-  // 3) Enviar correo (API Vercel)
-  try {
-    const cc = ['info@valleglaciares.com','oficina@valleglaciares.com']  // ← CC
-    const resp = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ to, subject, html, cc })
-    })
-
-    const data = await resp.json()
-    if(!resp.ok || !data?.ok){
-      console.error('Error al enviar correo', data)
-      alert(`Reserva ingresada (${idCode}), pero hubo un error enviando el correo.\nPuedes reenviar desde Post-Venta.`)
-    }else{
-      alert(`Reserva ingresada y correo enviado a ${to || 'cliente'}.\nCódigo: ${idCode}\nGrupo ${nextGroupForDate(snap.fechaLSR || '')}`)
+  async function doIngresarReserva(enviarCorreo:boolean){
+    const errs = validarReservaCompleta()
+    if (errs.length) {
+      alert(`Corrige:\n\n- ${errs.join('\n- ')}`)
+      return
     }
-  } catch (e:any){
-    console.error('Fallo de red/servidor al enviar correo', e)
-    alert(`Reserva ingresada (${idCode}), pero no fue posible contactar el servidor de correo.`)
+  
+    // 1) Guardar la reserva en la base local
+    const idCode = pickCodeForCommit(loggedVendor!, db, currentCode)
+    pushBasePasajeros('reserva', idCode)
+    pushBasePagos(idCode)
+    const snap = snapshotVoucher(idCode)
+    pushHistory(idCode, snap)
+  
+    // 1.b) Guardar en Supabase
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser()
+      if (!u) {
+        alert('Debes iniciar sesión para guardar la reserva en la base de datos.')
+      } else {
+        await saveReservaEnBD(snap, u.id)
+      }
+    } catch (e:any) {
+      console.error('Error al guardar en BD', e)
+      const msg = e?.message || e?.error_description || e?.hint || (e?.code ? `Error ${e.code}` : '') || JSON.stringify(e)
+      alert('Reserva ingresada, pero no se pudo guardar en la base de datos.\n\nDetalle: ' + msg)
+    }
+  
+    // 2) Enviar correo opcional
+    if (enviarCorreo) {
+      const primer = snap.pasajeros[0]
+      const to = (primer?.email || '').trim()
+      const subject = 'Bienvenido a la Patagonia, tu reserva se ha gestionado con éxito'
+      const html = correoReservaHTML(snap)
+      try {
+        const cc = ['info@valleglaciares.com','oficina@valleglaciares.com']
+        const resp = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ to, subject, html, cc })
+        })
+        const data = await resp.json()
+        if(!resp.ok || !data?.ok){
+          console.error('Error al enviar correo', data)
+          alert(`Reserva ingresada (${idCode}), pero hubo un error enviando el correo.\nPuedes reenviar desde Post-Venta.`)
+        } else {
+          alert(`Reserva ingresada y correo enviado a ${to || 'cliente'}.\nCódigo: ${idCode}\nGrupo ${nextGroupForDate(snap.fechaLSR || '')}`)
+        }
+      } catch (e:any){
+        console.error('Fallo de red/servidor al enviar correo', e)
+        alert(`Reserva ingresada (${idCode}), pero no fue posible contactar el servidor de correo.`)
+      }
+    } else {
+      alert(`Reserva ingresada. Código: ${idCode}.\nNo se envió el correo en este momento.`)
+    }
+  
+    // 3) Cerrar modal y pasar al siguiente código
+    setShowConfirmReserva(false)
+    beginNewSaleWithUniqueCode(loggedVendor!)
   }
-
-  // 4) Avanzar al siguiente código
-  beginNewSaleWithUniqueCode(loggedVendor!)
-}
 
   const onLogout = async ()=>{ 
     localStorage.removeItem('vg_vendor')
@@ -954,6 +950,61 @@ if (!enviarCorreo) {
       <button onClick={()=> setIdAction(null)}>Cancelar</button>
     </div>
   </div></div>
+)}
+
+{showConfirmReserva && (
+  <div style={overlayStyle}>
+    <div style={dialogStyle}>
+      <h2 style={{marginTop:0}}>Para registrar la reserva, seleccione una opción a continuación:</h2>
+
+      <div style={{display:'grid', gap:8, marginTop:12}}>
+        <button
+          onClick={()=> doIngresarReserva(true)}
+          style={{
+            padding:'10px 12px', borderRadius:10, fontWeight:700,
+            background:'rgba(234,179,8,0.18)', border:'1px solid rgba(234,179,8,0.35)', color:'#713f12',
+            transition:'transform 120ms ease'
+          }}
+          onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
+          onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+          onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+        >
+          Reservar y SI enviar correo
+        </button>
+
+        <button
+          onClick={()=> doIngresarReserva(false)}
+          style={{
+            padding:'10px 12px', borderRadius:10, fontWeight:700,
+            background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.35)', color:'#1e3a8a',
+            transition:'transform 120ms ease'
+          }}
+          onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
+          onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+          onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+        >
+          Reservar y NO enviar correo
+        </button>
+
+        <button
+          onClick={()=>{
+            setShowConfirmReserva(false)  // no guardamos nada
+            setTab('visor')               // volvemos a Visor diario
+          }}
+          style={{
+            padding:'10px 12px', borderRadius:10, fontWeight:700,
+            background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.35)', color:'#7f1d1d',
+            transition:'transform 120ms ease'
+          }}
+          onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
+          onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+          onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+        >
+          Cancelar reserva
+        </button>
+      </div>
+    </div>
+  </div>
 )}
 
       {showSettings && (
