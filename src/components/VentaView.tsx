@@ -19,7 +19,6 @@ type Props = {
   totalPersonas:number
   season:'alta'|'baja'
   snapshotVoucher:()=>any
-  ingresarPreReserva:()=>void
   ingresarReserva:()=>void
   ingresarReservaConCorreo: () => void
   totalPagado:number
@@ -47,7 +46,7 @@ export default function VentaView(props:Props){
     descuentoLSR, setDescuentoLSR, incluyeTransporte, setIncluyeTransporte,
     promoTipo, setPromoTipo, fechaPromo, setFechaPromo, proveedor, setProveedor, descuentoPromo, setDescuentoPromo,
     payments, setPayments, observaciones, setObservaciones, pasajeros, setPasajeros, totalPersonas, season,
-    ingresarPreReserva, ingresarReserva, ingresarReservaConCorreo, totalPagado,
+    ingresarReserva, ingresarReservaConCorreo, totalPagado,
     lsrSubtotal, transporteTotal, lsrDctoAplicado, totalLSRConTransporte,
     promoSubtotal, promoDctoAplicado, promoTotal, totalCotizacion, saldo, ngPreview, ratesLSR, transportPerPerson,
     openClearConfirm, proveedores,
@@ -267,8 +266,16 @@ export default function VentaView(props:Props){
 
         {/* Acciones (botones grandes + limpiar aquí) */}
         <div style={{display:'flex', gap:10, flexWrap:'wrap'}}>
-          <button style={btnPrimary} onClick={ingresarPreReserva}><span>📝</span> <span>Ingresar pre-reserva</span></button>
-          <button style={btnSuccess} onClick={ingresarReservaConCorreo}><span>📧</span> <span>Ingresar reserva + correo</span></button>
+          <button
+          style={{ ...btnSuccess, transition:'transform 120ms ease' }}
+          onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+          onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+          onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+          onClick={ingresarReservaConCorreo}
+        >
+          <span>📧</span> <span>Ingresar reserva + correo</span>
+        </button>
+          
           <button style={btnGhost} onClick={openClearConfirm}><span>🧹</span> <span>Limpiar</span></button>
         </div>
       </div>

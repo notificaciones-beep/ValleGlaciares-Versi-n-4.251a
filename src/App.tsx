@@ -673,7 +673,17 @@ useEffect(() => {
   alert('Reserva ingresada, pero no se pudo guardar en la base de datos.\n\nDetalle: ' + msg)
 }
 
-
+// 2) Confirmar si deseas enviar el correo al cliente ahora
+const enviarCorreo = window.confirm(
+  '¿Deseas enviar el correo con el resumen de compra ahora?\n\n' +
+  'Aceptar: Enviar correo\nCancelar: NO enviar ahora'
+)
+if (!enviarCorreo) {
+  alert(`Reserva ingresada. Código: ${idCode}.\nNo se envió el correo en este momento.`)
+  // 4) Avanzar al siguiente código
+  beginNewSaleWithUniqueCode(loggedVendor!)
+  return
+}
   // 2) Construir correo
   const primer = snap.pasajeros[0]
   const to = (primer?.email || '').trim()
@@ -796,7 +806,6 @@ useEffect(() => {
         totalPersonas={totalPersonas}
         season={season as any}
         snapshotVoucher={() => snapshotVoucher(currentCode)}
-        ingresarPreReserva={ingresarPreReserva}
         ingresarReserva={ingresarReserva}
         ingresarReservaConCorreo={ingresarReservaConCorreo}
         totalPagado={totalPagado}
