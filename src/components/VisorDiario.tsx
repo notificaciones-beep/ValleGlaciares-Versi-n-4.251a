@@ -159,7 +159,18 @@ export default function VisorDiario({db, computeSummaryForId, onClickId}:{db:Loc
   const lsrChip: React.CSSProperties = { padding:'2px 6px', borderRadius:8, background:'rgba(59,130,246,.10)', border:'1px solid rgba(59,130,246,.25)', color:'#1e3a8a', fontWeight:700 }
   const cmChip: React.CSSProperties  = { padding:'2px 6px', borderRadius:8, background:'rgba(236,72,153,.10)', border:'1px solid rgba(236,72,153,.25)', color:'#831843', fontWeight:700 }
   const ngColor = (ng:string): React.CSSProperties => {
-    const n = parseInt(ng||'0',10) || 0
+    const n = parseInt(ng || '0', 10) || 0
+  
+    // Si no hay número de grupo, usar un estilo neutro y evitar crash
+    if (n <= 0) {
+      return {
+        padding:'2px 8px', borderRadius:8,
+        background:'rgba(107,114,128,.10)', // gris suave
+        border:'1px solid rgba(107,114,128,.25)',
+        color:'#374151', fontWeight:700, display:'inline-block'
+      }
+    }
+  
     const palette = [
       {bg:'rgba(59,130,246,.10)', bd:'rgba(59,130,246,.25)', fg:'#1e3a8a'},
       {bg:'rgba(16,185,129,.10)', bd:'rgba(16,185,129,.25)', fg:'#065f46'},
@@ -168,9 +179,15 @@ export default function VisorDiario({db, computeSummaryForId, onClickId}:{db:Loc
       {bg:'rgba(99,102,241,.10)', bd:'rgba(99,102,241,.25)', fg:'#3730a3'},
       {bg:'rgba(6,182,212,.10)',  bd:'rgba(6,182,212,.25)',  fg:'#155e75'},
     ]
-    const c = palette[(n-1) % palette.length]
-    return { padding:'2px 8px', borderRadius:8, background:c.bg, border:`1px solid ${c.bd}`, color:c.fg, fontWeight:700, display:'inline-block' }
+    // Modulo positivo (evita índices negativos)
+    const idx = ((n - 1) % palette.length + palette.length) % palette.length
+    const c = palette[idx]
+    return {
+      padding:'2px 8px', borderRadius:8, background:c.bg,
+      border:`1px solid ${c.bd}`, color:c.fg, fontWeight:700, display:'inline-block'
+    }
   }
+
 
   function exportCSV(){
     if(!baseOrdenada.length){ alert('No hay datos del día.'); return }
@@ -297,7 +314,7 @@ export default function VisorDiario({db, computeSummaryForId, onClickId}:{db:Loc
                         <td style={{...td, width:colWidths.id}}>
                           <button style={idButtonStyle} onClick={()=> onClickId(r.id)}>{r.id}</button>
                         </td>
-                        <td style={{...td, width:colWidths.ng}}><span style={ngColor(r.ng)}>{r.ng}</span></td>
+                        <td style={{...td, width:colWidths.ng}}><span style={ngColor(r.ng)}>{r.ng || '—'}</span></td>
                         <td style={{...td, width:colWidths.nombre}}>{r.nombre}</td>
                         <td style={{...td, width:colWidths.documento}}>{r.doc}</td>
                         <td style={{...td, width:colWidths.nacionalidad}}>{r.nacionalidad}</td>
