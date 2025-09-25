@@ -197,18 +197,20 @@ export default function App(){
         setAuthReady(true)
       }
     )
-    useEffect(() => {
-      if (!authReady) return
-      const ch = supabase.channel('db-updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas'  }, () => setRefreshTick(t => t + 1))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pasajeros' }, () => setRefreshTick(t => t + 1))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos'     }, () => setRefreshTick(t => t + 1))
-        .subscribe()
-      return () => { try { supabase.removeChannel(ch) } catch {} }
-    }, [authReady])
-    
     return () => { sub.subscription?.unsubscribe?.() }
   }, [])
+  
+  // 2) Suscripción Realtime (se activa cuando authReady === true)
+  useEffect(() => {
+    if (!authReady) return
+    const ch = supabase.channel('db-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas'  }, () => setRefreshTick(t => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pasajeros' }, () => setRefreshTick(t => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos'     }, () => setRefreshTick(t => t + 1))
+      .subscribe()
+    return () => { try { supabase.removeChannel(ch) } catch {} }
+  }, [authReady])
+
   const [passwords, setPasswords] = useState<Record<VendorKey,string>>(
     loadJSON<Record<VendorKey,string>>(LS_PASSWORDS, DEFAULT_PASSWORDS)
   )
@@ -340,7 +342,6 @@ useEffect(() => {
 
         // NG por fecha: orden estable (created_at, luego codigo)
         const codesByDate = new Map<string, {code:string, created:string}[]>()
-        // NG por fecha: orden estable (created_at, luego código)
           
         for (const r of (rs || [])) {
           if (!r.fecha_lsr) continue
