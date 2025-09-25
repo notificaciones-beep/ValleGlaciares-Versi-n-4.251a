@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { BasePagosRow, BasePasajerosRow, CategoriaLSR, LocalDB } from '../types'
 import { nInt, nowISO, CLP } from '../utils'
+import { supabase } from '../supabaseClient'
 // tarifas y transporte entran por props (compat admin)
 
 const LS_MOD_STATE = 'vg_mod_last_id' // persistimos SOLO el último ID abierto
@@ -303,7 +304,7 @@ export default function Modificaciones(
   }
 
   // Lógica central de guardado, recibe el motivo desde el diálogo
-  function guardarConMotivo(motivo: string){
+  async function guardarConMotivo(motivo: string){
     if(!rows.length){ alert('Carga un ID primero.'); return }
 
     if(capillasTipo && rows.some(r => (r.cm_valor || 0) > 0) && !fechaCM){
@@ -369,11 +370,72 @@ export default function Modificaciones(
     }
     setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, mov]}))
 
+    // === Persistencia en BD: reservas + pasajeros ===
+    try{
+      // 1) Obtener usuario y encontrar la reserva por su código (loadedId)
+      const { data: { user: u } } = await supabase.auth.getUser()
+      if(!u){ alert('No hay sesión iniciada. Inicia sesión e intenta de nuevo.'); return }
+
+      const { data: rsv, error: eFind } = await supabase
+        .from('reservas')
+        .select('id')
+        .eq('codigo', loadedId)
+        .maybeSingle()
+
+      if (eFind || !rsv?.id) {
+        alert('No se encontró la reserva en BD para este ID. ¿Se creó con “Ingresar reserva + correo”?')
+      } else {
+        // 2) Actualizar campos básicos de la reserva
+        const upd: any = {
+          fecha_lsr: fechaLSR || null,
+          descuento_lsr: dctoLSR || 0,
+          motivo_dcto_lsr: motivo || null,
+          // Capillas de Mármol (si aplica)
+          servicio_cm: capillasTipo || null,           // 'FM' | 'CM' | null
+          fecha_cm: capillasTipo ? (fechaCM || null) : null,
+          descuento_cm: dctoCM || 0,
+          proveedor: capillasTipo ? (proveedor || null) : null
+        }
+
+        const { error: eUpd } = await supabase
+          .from('reservas')
+          .update(upd)
+          .eq('id', rsv.id)
+
+        if (eUpd) throw eUpd
+
+        // 3) Reemplazar pasajeros (DELETE + INSERT)
+        const { error: eDelP } = await supabase
+          .from('pasajeros')
+          .delete()
+          .eq('reserva_id', rsv.id)
+        if (eDelP) throw eDelP
+
+        const rowsToInsert = rows.map(r => ({
+          reserva_id: rsv.id,
+          nombre: r.nombre || null,
+          rut_pasaporte: r.doc || null,
+          nacionalidad: r.nacionalidad || null,
+          telefono: r.telefono || null,
+          email: r.email || null,
+          categoria: r.lsr_categoria  // 'adulto' | 'nino' | 'infante'
+        }))
+        if (rowsToInsert.length){
+          const { error: eInsP } = await supabase.from('pasajeros').insert(rowsToInsert)
+          if (eInsP) throw eInsP
+        }
+      }
+    } catch(e:any){
+      alert('No se pudo guardar los cambios en la BD: ' + (e?.message || e))
+      return
+    }
+    // === Fin persistencia en BD ===
     alert('Modificación guardada.')
   }
 
-  // ---- Eliminar grupo (soft log + remover del día) ----
-  function eliminarGrupo(){
+  // === Persistencia en BD: eliminar pasajeros del grupo + log en pagos ===
+
+  async function eliminarGrupo(){
     if(!rows.length || !loadedId){ alert('Carga un ID primero.'); return }
     if(!motivoDelete.trim()){
       alert('Ingresa el motivo de eliminación.')
@@ -393,6 +455,41 @@ export default function Modificaciones(
     }
     setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, mov]}))
 
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser()
+      if(!u){ alert('No hay sesión iniciada. Inicia sesión e intenta de nuevo.'); return }
+  
+      const { data: rsv, error: eFind } = await supabase
+        .from('reservas')
+        .select('id')
+        .eq('codigo', loadedId)
+        .maybeSingle()
+  
+      if (eFind || !rsv?.id) {
+        alert('No se encontró la reserva en BD para este ID.')
+      } else {
+        // 1) Borrar pasajeros de esa reserva
+        const { error: eDelP } = await supabase
+          .from('pasajeros')
+          .delete()
+          .eq('reserva_id', rsv.id)
+        if (eDelP) throw eDelP
+  
+        // 2) Insertar movimiento 0 en pagos (log de eliminación)
+        const { error: eInsPay } = await supabase.from('pagos').insert({
+          reserva_id: rsv.id,
+          vendedor_uid: u.id,
+          medio: 'modificacion',
+          monto: 0,
+          comprobante: `DEL: ${motivoDelete}`
+        })
+        if (eInsPay) throw eInsPay
+      }
+    } catch(e:any){
+      alert('No se pudo reflejar la eliminación en la BD: ' + (e?.message || e))
+      return
+    }
+    // === Fin persistencia en BD ===
     try{ localStorage.removeItem(LS_MOD_STATE) }catch{}
     setRows([]); setLoadedId(''); setQueryId('')
     setShowDelete(false); setMotivoDelete('')
