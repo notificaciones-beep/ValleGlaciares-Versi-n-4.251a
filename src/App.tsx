@@ -264,31 +264,69 @@ useEffect(() => {
         const { data: { user: u } } = await supabase.auth.getUser()
         if(!u) return
   
-        // Leer reservas con pasajeros y pagos del usuario actual
-        const sel = `
-        id, codigo, vendedor_uid, fecha_lsr, valor_transporte, descuento_lsr, proveedor,
-        servicio_cm, fecha_cm, valor_cm, descuento_cm, created_at,
-        pasajeros:pasajeros ( id, nombre, rut_pasaporte, nacionalidad, telefono, email, categoria ),
-        pagos:pagos ( id, medio, monto, comprobante, created_at )
-      `
-
-        const { data: rs, error } = await supabase
+        // 1) Leer RESERVAS (sin relaciones anidadas)
+        const { data: rs, error: eR } = await supabase
           .from('reservas')
-          .select(sel)
-        if (error) { console.error('[VG] leer reservas:', error); return }
+          .select('id,codigo,vendedor_uid,fecha_lsr,valor_transporte,descuento_lsr,proveedor,servicio_cm,fecha_cm,valor_cm,descuento_cm,created_at')
+        if (eR) {
+          console.error('[VG] leer reservas:', eR)
+          alert('No se pudieron leer reservas: ' + (eR.message || JSON.stringify(eR)))
+          return
+        }
+        const ids = (rs||[]).map(r=> r.id)
+        if (!ids.length){
+          // No hay reservas aún: vaciar bases y salir
+          setDb(prev => ({ ...prev, base_pasajeros: [], base_pagos: [] }))
+          return
+        }
   
-        // Transformar a la base local (para visores y post-venta)
+        // 2) Leer PASAJEROS de esas reservas
+        const { data: ps, error: eP } = await supabase
+          .from('pasajeros')
+          .select('id,reserva_id,nombre,rut_pasaporte,nacionalidad,telefono,email,categoria')
+          .in('reserva_id', ids)
+        if (eP) {
+          console.error('[VG] leer pasajeros:', eP)
+          alert('No se pudieron leer pasajeros: ' + (eP.message || JSON.stringify(eP)))
+          return
+        }
+  
+        // 3) Leer PAGOS de esas reservas
+        const { data: pg, error: eG } = await supabase
+          .from('pagos')
+          .select('id,reserva_id,medio,monto,comprobante,created_at')
+          .in('reserva_id', ids)
+        if (eG) {
+          console.error('[VG] leer pagos:', eG)
+          alert('No se pudieron leer pagos: ' + (eG.message || JSON.stringify(eG)))
+          return
+        }
+  
+        // Índices por reserva_id
+        const paxByReserva = new Map<number, any[]>()
+        for (const p of (ps||[])) {
+          const k = p.reserva_id
+          if (!paxByReserva.has(k)) paxByReserva.set(k, [])
+          paxByReserva.get(k)!.push(p)
+        }
+        const pagosByReserva = new Map<number, any[]>()
+        for (const p of (pg||[])) {
+          const k = p.reserva_id
+          if (!pagosByReserva.has(k)) pagosByReserva.set(k, [])
+          pagosByReserva.get(k)!.push(p)
+        }
+  
+        // 4) Transformar en base local
         const base_pasajeros: BasePasajerosRow[] = []
         const base_pagos: BasePagosRow[] = []
   
         for (const r of (rs||[])) {
-          // Temporada para esa fecha (usa config actual)
           const seasonR = getSeasonFromConfig(r.fecha_lsr || '', effectiveConf)
           const lsrRates = (effectiveConf.ratesLSR as any)[seasonR] || { adulto:0, nino:0, infante:0 }
           const perPersonT = (effectiveConf.transport as any)[seasonR] || 0
   
           // Pasajeros
-          for (const p of (r.pasajeros||[])) {
+          for (const p of (paxByReserva.get(r.id) || [])) {
             const lsr_valor =
               p.categoria==='adulto' ? lsrRates.adulto :
               p.categoria==='nino'   ? lsrRates.nino   :
@@ -296,9 +334,9 @@ useEffect(() => {
             base_pasajeros.push({
               createdAt: r.created_at || nowISO(),
               estado: 'reserva',
-              vendedor: '(BD)',   // nombre amigable opcional; podemos mapearlo luego
+              vendedor: '(BD)',
               id: r.codigo,
-              ng: '',             // grupo no persistido: lo dejamos vacío
+              ng: '',
               nombre: p.nombre || '',
               doc: p.rut_pasaporte || '',
               nacionalidad: p.nacionalidad || '',
@@ -312,34 +350,35 @@ useEffect(() => {
               cm_categoria: '',
               proveedor: r.proveedor || '',
               fecha_cm: r.fecha_cm || '',
-              cm_valor: 0,                     // r.valor_cm es total por reserva; dejamos 0 por pasajero
+              cm_valor: 0, // total por reserva -> lo dejamos 0 por pasajero
               cm_descuento: r.descuento_cm || 0,
- 
               observaciones: '',
               fecha_lsr: r.fecha_lsr || ''
             })
           }
   
           // Pagos
-          for (const pg of (r.pagos||[])) {
+          for (const p of (pagosByReserva.get(r.id) || [])) {
             base_pagos.push({
-              createdAt: pg.created_at || nowISO(),
+              createdAt: p.created_at || nowISO(),
               vendedor: '(BD)',
               id: r.codigo,
-              medio: pg.medio || '',
-              monto: pg.monto || 0,
-              comprobante: pg.comprobante || ''
+              medio: p.medio || '',
+              monto: p.monto || 0,
+              comprobante: p.comprobante || ''
             })
           }
         }
   
-        // Cargar en el estado local de la app
         setDb(prev => ({ ...prev, base_pasajeros, base_pagos }))
+        console.log(`[VG] Sync BD ok → reservas=${rs?.length||0}, pax=${ps?.length||0}, pagos=${pg?.length||0}`)
       } catch(e){
         console.error('[VG] sync inicial BD', e)
+        alert('Error leyendo BD: ' + (e as any)?.message)
       }
     })()
   }, [authReady, user?.id, loggedVendor, effectiveConf])
+
 
 
   // 1) Si NO hay sesión de Supabase, pedir login real (email + contraseña)
@@ -569,7 +608,9 @@ useEffect(() => {
       }, u.id)
     } catch(e:any){
       console.error('[VG] pre-reserva BD', e)
-      alert('Pre-reserva ingresada, pero no se pudo guardar en la base de datos.')
+      const msg = e?.message || e?.error_description || e?.hint || (e?.code ? `Error ${e.code}` : '') || JSON.stringify(e)
+      alert(`Pre-reserva ingresada, pero no se pudo guardar en la base de datos.\n\nDetalle: ${msg}`)
+
     }
 
     alert(`Pre-reserva ingresada: ${idCode}\n\nGrupo asignado para ${fechaLSR}: ${nextGroupForDate(fechaLSR)}`)
