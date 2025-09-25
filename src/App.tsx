@@ -26,6 +26,7 @@ import { sendReservationEmails } from './email'
 import SafeMount from './components/SafeMount'  // ⬅️ agrega este import
 // === Registry de códigos retirados (no reutilizables) ===
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
+const [refreshTick, setRefreshTick] = useState(0)
 
 function safeYYYYMMDD(d?: string | null): string | null {
   if (!d) return null
@@ -326,7 +327,26 @@ useEffect(() => {
         // 4) Transformar en base local
         const base_pasajeros: BasePasajerosRow[] = []
         const base_pagos: BasePagosRow[] = []
-  
+
+        // NG por fecha: orden estable (created_at, luego codigo)
+        const codesByDate = new Map<string, {code:string, created:string}[]>()
+        for (const r of (rs || [])) {
+          if (!r.fecha_lsr) continue
+          const arr = codesByDate.get(r.fecha_lsr) || []
+          arr.push({ code: r.codigo, created: r.created_at || '9999-12-31T23:59:59Z' })
+          codesByDate.set(r.fecha_lsr, arr)
+        }
+        const ngByCode = new Map<string, string>()
+        for (const [date, arr] of codesByDate) {
+          arr.sort((a,b)=>{
+            if (a.created < b.created) return -1
+            if (a.created > b.created) return 1
+            return a.code.localeCompare(b.code)
+          })
+          arr.forEach((x, i)=> ngByCode.set(x.code, String(i+1)))
+        } 
+
+        
         for (const r of (rs||[])) {
           const seasonR = getSeasonFromConfig(r.fecha_lsr || '', effectiveConf)
           const lsrRates = (effectiveConf.ratesLSR as any)[seasonR] || { adulto:0, nino:0, infante:0 }
@@ -343,7 +363,7 @@ useEffect(() => {
               estado: 'reserva',
               vendedor: '(BD)',
               id: r.codigo,
-              ng: '',
+              ng: ngByCode.get(r.codigo) || '—',
               nombre: p.nombre || '',
               doc: p.rut_pasaporte || '',
               nacionalidad: p.nacionalidad || '',
@@ -384,8 +404,27 @@ useEffect(() => {
         alert('Error leyendo BD: ' + (e as any)?.message)
       }
     })()
-  }, [authReady, user?.id, loggedVendor, effectiveConf])
+  }, [authReady, user?.id, loggedVendor, effectiveConf, refreshTick])
 
+  useEffect(() => {
+    const bump = () => setRefreshTick(t => t + 1)
+    const onVis = () => { if (!document.hidden) bump() }
+    window.addEventListener('focus', bump)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('focus', bump)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
+
+  useEffect(()=>{
+    if (tab==='visor' || tab==='mensual') {
+      const h = setInterval(()=> setRefreshTick(t=>t+1), 15000) // cada 15s
+      const onFocus = ()=> setRefreshTick(t=>t+1)
+      window.addEventListener('focus', onFocus)
+      return ()=> { clearInterval(h); window.removeEventListener('focus', onFocus) }
+    }
+  }, [tab])
 
 
   // 1) Si NO hay sesión de Supabase, pedir login real (email + contraseña)
@@ -779,8 +818,8 @@ useEffect(() => {
       <div style={{border:'1px solid #e5e7eb', borderRadius:10, padding:8, marginBottom:12, display:'flex', gap:8, flexWrap:'wrap'}}>
        <button onClick={()=>setTab('venta')} style={{fontWeight: tab==='venta'?700:400}}>Ingreso de venta</button>
         <button onClick={()=>setTab('postventa')} style={{fontWeight: tab==='postventa'?700:400}}>Post-venta: Pagos/Reembolsos</button>
-        <button onClick={()=>setTab('visor')} style={{fontWeight: tab==='visor'?700:400}}>Visor diario</button>
-        <button onClick={()=>setTab('mensual')} style={{fontWeight: tab==='mensual'?700:400}}>Visor mensual</button>
+        <button onClick={()=>{ setTab('visor'); setRefreshTick(t=>t+1) }} style={{fontWeight: tab==='visor'?700:400}}>Visor diario</button>
+        <button onClick={()=>{ setTab('mensual'); setRefreshTick(t=>t+1) }} style={{fontWeight: tab==='mensual'?700:400}}>Visor mensual</button>
         <button onClick={()=>setTab('mod')} style={{fontWeight: tab==='mod'?700:400}}>Modificaciones</button>
         <button onClick={()=>setTab('base')} style={{fontWeight: tab==='base'?700:400}}>Base de datos</button>
         {(getVendorMeta(loggedVendor!).name === 'Admin' || loggedVendor === 'javier') && (
@@ -989,7 +1028,7 @@ useEffect(() => {
         <button
           onClick={()=>{
             setShowConfirmReserva(false)  // no guardamos nada
-            setTab('visor')               // volvemos a Visor diario
+            // NO cambiamos de pestaña; nos quedamos en "venta"
           }}
           style={{
             padding:'10px 12px', borderRadius:10, fontWeight:700,
