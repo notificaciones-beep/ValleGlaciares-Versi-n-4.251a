@@ -728,7 +728,11 @@ useEffect(() => {
       if (!u) {
         alert('Debes iniciar sesión para guardar la reserva en la base de datos.')
       } else {
-        await saveReservaEnBD(snap, u.id)
+        await saveReservaEnBD(
+          snap,
+          u.id,
+          payments.filter(p => (p.monto || 0) !== 0)
+        )
         setRefreshTick(t => t + 1) // ← fuerza refresh inmediato
       }
     } catch (e:any) {

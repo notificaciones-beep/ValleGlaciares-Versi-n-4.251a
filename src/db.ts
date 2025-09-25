@@ -2,7 +2,12 @@
 import { supabase } from './supabaseClient'
 import type { VoucherData } from './types'
 
-export async function saveReservaEnBD(snap: VoucherData, vendedorUid: string){
+export async function saveReservaEnBD(
+  snap: VoucherData,
+  vendedorUid: string,
+  payments?: { medio: string; monto: number; comprobante?: string }[]
+){
+
   // 1) Inserta la reserva
   const { data: reserva, error } = await supabase
     .from('reservas')
@@ -56,6 +61,22 @@ export async function saveReservaEnBD(snap: VoucherData, vendedorUid: string){
     }))
     const { error: e2 } = await supabase.from('pasajeros').insert(rows)
     if (e2) throw e2
+    // 4) Si hay pagos iniciales, insertarlos en BD
+  if (payments && payments.length) {
+    const rowsPay = payments
+      .filter(p => (p.monto || 0) !== 0) // acepta positivos (pago) y negativos (reembolso)
+      .map(p => ({
+        reserva_id: reserva.id,
+        medio: p.medio,
+        monto: p.monto,
+        comprobante: p.comprobante || null
+      }))
+
+    if (rowsPay.length) {
+      const { error: ePay } = await supabase.from('pagos').insert(rowsPay)
+      if (ePay) throw ePay
+    }
+  }
   }
 
   // (Opcional) Insertar pagos cuando tengas el detalle listo.
