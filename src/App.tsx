@@ -27,6 +27,12 @@ import SafeMount from './components/SafeMount'  // ⬅️ agrega este import
 // === Registry de códigos retirados (no reutilizables) ===
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
 
+function safeYYYYMMDD(d?: string | null): string | null {
+  if (!d) return null
+  const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return m ? d : null
+}
+
 function loadRetired(): Set<string> {
   try { return new Set<string>(JSON.parse(localStorage.getItem(LS_ID_RETIRED) || '[]')) } catch { return new Set() }
 }
@@ -167,7 +173,7 @@ function getSeasonFromConfig(dateStr:string, conf:EffectiveConfig): 'alta'|'baja
     const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
     if (m) return parseInt(m[2], 10) // 1..12 directo del string
     // fallback si viene con hora u otro formato:
-    const d = new Date(dateStr)
+    const d = new Date(dateStr)    
     return Number.isFinite(d.getTime()) ? (d.getMonth() + 1) : 0
   })()
   return conf.altaMonths.includes(m) ? 'alta' : 'baja'
@@ -788,7 +794,7 @@ if (!enviarCorreo) {
       
 
       {tab==='venta' ? (
-  <ErrorBoundary label="venta">
+  <ErrorBoundary key="venta" label="venta">
       <VentaView
         fechaLSR={fechaLSR} setFechaLSR={setFechaLSR}
         cantAdulto={cantAdulto} setCantAdulto={setCantAdulto}
@@ -827,7 +833,7 @@ if (!enviarCorreo) {
       />
   </ErrorBoundary>
 ) : tab==='postventa' ? (
-  <ErrorBoundary label="postventa">
+  <ErrorBoundary key="postventa" label="postventa">
     <SafeMount>
       <PostVentaPagos
         db={db}
@@ -841,7 +847,7 @@ if (!enviarCorreo) {
     </SafeMount>
   </ErrorBoundary>
 ) : tab==='visor' ? (
-  <ErrorBoundary label="visor-diario">
+  <ErrorBoundary key="visor-diario" label="visor-diario">
     <SafeMount>
       <VisorDiario
         db={db}
@@ -851,7 +857,7 @@ if (!enviarCorreo) {
     </SafeMount>
   </ErrorBoundary>
 ) : tab==='mensual' ? (
-  <ErrorBoundary label="visor-mensual">
+  <ErrorBoundary key="visor-mensual" label="visor-mensual">
     <SafeMount>
       <VisorMensual
         db={db}
@@ -860,7 +866,7 @@ if (!enviarCorreo) {
     </SafeMount>
   </ErrorBoundary>
 ) : tab==='mod' ? (
-  <ErrorBoundary label="modificaciones">
+  <ErrorBoundary key="modificaciones" label="modificaciones">
     <SafeMount>
       <Modificaciones
         db={db}
@@ -877,13 +883,13 @@ if (!enviarCorreo) {
     </SafeMount>
   </ErrorBoundary>
 ) : tab==='admin' ? (
-  <ErrorBoundary label="config-avanzadas">
+  <ErrorBoundary key="config-avanzadas" label="config-avanzadas">
     <SafeMount>
       <ConfigAvanzadas />
     </SafeMount>
   </ErrorBoundary>
 ) : (
-  <ErrorBoundary label="base-datos">
+  <ErrorBoundary key="base-datos" label="base-datos">
     <SafeMount>
       <BaseDatos db={db} />
     </SafeMount>
