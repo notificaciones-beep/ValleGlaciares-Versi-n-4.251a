@@ -69,35 +69,31 @@ export async function saveReservaEnBD(
   if (Array.isArray(snap.pasajeros) && snap.pasajeros.length){
     const rows = snap.pasajeros.map((p:any)=>({
       reserva_id: reservaId,
-      codigo: snap.codigo,
       nombre: p.nombre ?? null,
       rut_pasaporte: p.doc ?? p.rut ?? p.pasaporte ?? null,
       nacionalidad: p.nacionalidad ?? null,
       telefono: p.telefono ?? null,
       email: p.email ?? null,
-      categoria: p.categoria, // 'adulto' | 'nino' | 'infante'
-      cm_incluye: !!p.capillas             // ⬅️ NUEVO: persistimos si ese pasajero lleva CM
+      categoria: p.categoria,
+      cm_incluye: !!p.capillas
     }))
     const { error: e2 } = await supabase.from('pasajeros').insert(rows)
     if (e2) throw e2
   }
-
+  
   // 3) Si hay pagos iniciales, insertarlos en BD
-  if (payments && payments.length) {
-    const rowsPay = payments
-      .filter(p => (p.monto || 0) !== 0) // acepta positivos (pago) y negativos (reembolso)
-      .map(p => ({
-        reserva_id: reservaId,
-        codigo: snap.codigo,
-        medio: p.medio,
-        monto: p.monto,
-        comprobante: p.comprobante || null
-      }))
-
-    if (rowsPay.length) {
-      const { error: ePay } = await supabase.from('pagos').insert(rowsPay)
-      if (ePay) throw ePay
-    }
+  const rowsPay = (payments ?? [])
+    .filter(p => (p.monto || 0) !== 0) // acepta positivos (pago) y negativos (reembolso)
+    .map(p => ({
+      reserva_id: reservaId,
+      medio: p.medio,
+      monto: p.monto,
+      comprobante: p.comprobante || null
+    }))
+  
+  if (rowsPay.length) {
+    const { error: ePay } = await supabase.from('pagos').insert(rowsPay)
+    if (ePay) throw ePay
   }
 
   return reservaId
@@ -172,7 +168,6 @@ export async function updateReservaEnBD(params: {
 
   const rows = pasajeros.map(p => ({
     reserva_id: reservaId,
-    codigo,
     nombre: p.nombre || null,
     rut_pasaporte: p.rut_pasaporte || null,
     nacionalidad: p.nacionalidad || null,
@@ -188,9 +183,21 @@ export async function updateReservaEnBD(params: {
 
   // 5) log de modificación (para “Modificación” en visor)
   const { error: eLog } = await supabase
-    .from('pagos')
-    .insert([{ reserva_id: reservaId, id: codigo, medio: 'transferencia', monto: 0, comprobante: `MOD: ${motivoMod}` }])
-  if (eLog) throw eLog
+  .from('pagos')
+  .insert([{ reserva_id: reservaId, medio: 'transferencia', monto: 0, comprobante: `MOD: ${motivoMod}` }])
+if (eLog) throw eLog
 
   return reservaId
+}
+// Helper: obtener el ID numérico a partir del código textual (ej: "A18")
+async function reservaIdFromCodigo(codigo: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('reservas')
+    .select('id')
+    .eq('codigo', codigo)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(`No existe una reserva con código ${codigo}`)
+  return data.id as number
 }
