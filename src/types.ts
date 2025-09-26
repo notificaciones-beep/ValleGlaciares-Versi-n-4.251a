@@ -57,3 +57,23 @@ export type LocalDB = {
 
 export type RatesLSR = Record<'alta'|'baja', { adulto:number, nino:number, infante:number }>
 export type RatesPromo = Record<'FM'|'CM', { adulto:number, nino:number, infante:number }>
+export type AdminRatesSeason = { adulto:number; nino:number; infante:number }
+export type AdminRatesLSR = { alta:AdminRatesSeason; baja:AdminRatesSeason }
+export type AdminTransport = { alta:number; baja:number }
+export type AdminRatesPromo = { FM:AdminRatesSeason; CM:AdminRatesSeason }
+
+export type EffectiveConfig = {
+  bajaMonths: number[];
+  altaMonths: number[];
+  ratesLSR: AdminRatesLSR;
+  transport: AdminTransport;
+  ratesPromo: AdminRatesPromo;
+  proveedores: string[];
+  mediosPago: string[];
+}
+
+export type VendorOverride = Partial<{
+  name:string; prefix:string; start:number; end:number
+}>
+export type VendorOverridesMap = Partial<Record<string, VendorOverride>>
+

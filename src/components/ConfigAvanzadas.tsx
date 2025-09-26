@@ -1,6 +1,7 @@
 // src/components/ConfigAvanzadas.tsx
 import React from 'react'
 import { VENDORS, LS_PASSWORDS, DEFAULT_PASSWORDS } from '../state'
+import { supabase } from '../supabaseClient' 
 
 /** ────────────────────────────────────────────────────────────────────────────
  *  Constantes de storage y tipos locales
@@ -33,6 +34,8 @@ function deleteVendor(key:string, nombreVisible:string){
   const overrides = loadVendorOverrides()
   delete (overrides as any)[key]
   saveVendorOverrides(overrides)
+
+
 
   // 2) Remover su contraseña almacenada
   const pw = readPwMap()
@@ -109,7 +112,7 @@ function addNewVendor() {
     }
   }
 
-  // Guardar override
+  // Guardar override local
   overrides[key] = { name, prefix, start, end }
   saveVendorOverrides(overrides)
 
@@ -202,6 +205,58 @@ function saveVendorOverrides(map: VendorOverridesMap){
   window.dispatchEvent(new Event('vg:config-updated'))
 }
 
+async function loadConfigFromDB() {
+  const { data, error } = await supabase
+    .from('config_admin')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+async function saveConfigToDB(payload: {
+  baja_months:number[]; alta_months:number[];
+  rates_lsr:any; transport:any; rates_promo:any;
+  proveedores:string[]; medios_pago:string[];
+}) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { error } = await supabase.from('config_admin').insert({
+    ...payload,
+    updated_by: user?.id ?? null
+  })
+  if (error) throw error
+}
+
+async function loadOverridesFromDB() {
+  const { data, error } = await supabase
+    .from('vendor_overrides')
+    .select('vendor_key,name,prefix,range_start,range_end')
+  if (error) throw error
+  return data || []
+}
+
+async function replaceAllOverridesInDB(overrides: Record<string, Partial<{ name:string; prefix:string; start:number; end:number }>>) {
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // upsert por vendor_key (índice único)
+  const rows = Object.entries(overrides).map(([vendor_key, ov]) => ({
+    vendor_key,
+    name: ov.name ?? null,
+    prefix: ov.prefix ?? null,
+    range_start: ov.start ?? null,
+    range_end: ov.end ?? null,
+    updated_by: user?.id ?? null
+  }))
+  if (!rows.length) return
+
+  const { error } = await supabase
+    .from('vendor_overrides')
+    .upsert(rows, { onConflict: 'vendor_key' })
+  if (error) throw error
+}
+
 /** ────────────────────────────────────────────────────────────────────────────
  *  Subcomponente: Perfiles (existentes)
  *  ───────────────────────────────────────────────────────────────────────── */
@@ -239,7 +294,7 @@ function PerfilesExistentes(){
   }
 
 
-  const guardar = ()=>{
+  const guardar = async ()=>{
     for(const r of rows){
       if(!r.name.trim()){ alert(`Nombre vacío en perfil ${r.key}`); return }
       if(!r.prefix.trim()){ alert(`Prefijo vacío en perfil ${r.key}`); return }
@@ -248,8 +303,18 @@ function PerfilesExistentes(){
         alert(`Rango inválido en perfil ${r.key}`); return
       }
     }
-    saveVendorOverrides(overrides)
-    alert('Perfiles guardados.')
+    try{
+      // 1) BD (si hay sesión)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await replaceAllOverridesInDB(overrides) // upsert por vendor_key
+      }
+      // 2) Espejo local
+      saveVendorOverrides(overrides)
+      alert('Perfiles guardados.')
+    }catch(e:any){
+      alert('Perfiles guardados localmente, pero falló la BD: ' + (e?.message || e))
+    }
   }
 
   const inputStyle: React.CSSProperties = { padding:'6px 8px', border:'1px solid #e5e7eb', borderRadius:8 }
@@ -319,6 +384,46 @@ function PerfilesExistentes(){
 export default function ConfigAvanzadas(){
   const [conf, setConf] = React.useState<EffectiveConfig>(loadAdminConfig)
 
+  // Cargar desde BD (si hay sesión) y espejar en localStorage
+  React.useEffect(()=>{ (async ()=>{
+    try{
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return  // si no hay login, seguimos con el mirror local
+
+      // 1) Config global
+      const row = await loadConfigFromDB()
+      if (row) {
+        const next: EffectiveConfig = {
+          bajaMonths: row.baja_months || [],
+          altaMonths: row.alta_months || [],
+          ratesLSR: row.rates_lsr || { alta:{adulto:0,nino:0,infante:0}, baja:{adulto:0,nino:0,infante:0} },
+          transport: row.transport || { alta:0, baja:0 },
+          ratesPromo: row.rates_promo || { FM:{adulto:0,nino:0,infante:0}, CM:{adulto:0,nino:0,infante:0} },
+          proveedores: row.proveedores || [],
+          mediosPago: row.medios_pago || [],
+        }
+        setConf(next)
+        saveAdminConfig(next) // espejo local + evento
+      }
+
+      // 2) Overrides de vendedores
+      const ovs = await loadOverridesFromDB()
+      const map: Record<string, Partial<{ name:string; prefix:string; start:number; end:number }>> = {}
+      for (const r of ovs) {
+        map[r.vendor_key] = {
+          name: r.name ?? undefined,
+          prefix: r.prefix ?? undefined,
+          start: r.range_start ?? undefined,
+          end: r.range_end ?? undefined,
+        }
+      }
+      // Guardar en localStorage para que lo lean Login/App
+      writeOverrides(map)
+    } catch (e) {
+      console.error('[ConfigAvanzadas] carga inicial desde BD:', e)
+    }
+  })() }, [])
+
   // Helpers de UI
   const card: React.CSSProperties = { border:'1px solid #e5e7eb', borderRadius:12 }
   const pad: React.CSSProperties  = { padding:12 }
@@ -333,13 +438,33 @@ export default function ConfigAvanzadas(){
     })
   }
 
-  const saveAll = ()=>{
+  const saveAll = async ()=>{
     if(!conf.altaMonths.length && !conf.bajaMonths.length){
       alert('Debes seleccionar al menos un mes en alguna temporada.')
       return
     }
-    saveAdminConfig(conf)
-    alert('Configuración guardada.')
+    try {
+      // 1) espejo local (para que la UI del resto de la app reaccione al instante)
+      saveAdminConfig(conf)
+  
+      // 2) persistir en BD (si hay sesión)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await saveConfigToDB({
+          baja_months: conf.bajaMonths,
+          alta_months: conf.altaMonths,
+          rates_lsr: conf.ratesLSR,
+          transport: conf.transport,
+          rates_promo: conf.ratesPromo,
+          proveedores: conf.proveedores,
+          medios_pago: conf.mediosPago
+        })
+      }
+  
+      alert('Configuración guardada.')
+    } catch (e:any) {
+      alert('La configuración se guardó localmente, pero falló en BD: ' + (e?.message || e))
+    }
   }
 
   const MonthBox = ({n}:{n:number})=>{
