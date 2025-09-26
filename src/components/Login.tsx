@@ -84,6 +84,7 @@ export default function VendorLogin({ onLogin, getPwd }: Props) {
         localStorage.setItem(LS_VENDOR_OVERRIDES, JSON.stringify(fresh))
         const merged = mergeBaseAndOverrides(fresh)
         if (Object.keys(merged).length === 0) {
+          // Fallback: mantener Admin si DB viene vacía
           merged.javier = { name: 'Admin', prefix: 'A', start: 1, end: 1000 }
         }
         if (!cancelled) {
@@ -91,15 +92,17 @@ export default function VendorLogin({ onLogin, getPwd }: Props) {
           setLoading(false)
         }
 
-        // Disparo eventos para que otros se enteren
-        window.dispatchEvent(new Event('storage'))
-        window.dispatchEvent(new Event('vg:overrides-updated'))
-
       } catch (e) {
         console.error('[VendorLogin] fetch overrides failed:', e)
         setLoading(false)
       }
     }
+
+    React.useEffect(() => {
+      if (!options.length) return
+      const exists = options.some(o => o.key === vendor)
+      if (!exists) setVendor(options[0].key)
+    }, [options, vendor])
 
     load()
 
@@ -109,22 +112,17 @@ export default function VendorLogin({ onLogin, getPwd }: Props) {
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVis)
 
-    // Escucho eventos internos de la app para refrescar
-    const onKick = () => load()
-    window.addEventListener('vg:overrides-updated', onKick)
-    window.addEventListener('storage', onKick)
-
     // Realtime: si cambian overrides en DB, refrescar
     const ch = supabase.channel('rt-vendor-overrides')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_overrides' }, onKick)
-      .subscribe()
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_overrides' }, () => {
+      load()  // refresca la lista desde DB sin disparar eventos ni loops
+    })
+    .subscribe()
 
     return () => {
       cancelled = true
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVis)
-      window.removeEventListener('vg:overrides-updated', onKick)
-      window.removeEventListener('storage', onKick)
       try { supabase.removeChannel(ch) } catch {}
     }
   }, [])
