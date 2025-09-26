@@ -84,13 +84,6 @@ export async function saveReservaEnBD(
   
   // 3) Si hay pagos iniciales, insertarlos en BD
   const rowsPay = (payments ?? [])
-    .filter(p => (p.monto || 0) !== 0) // acepta positivos (pago) y negativos (reembolso)
-    .map(p => ({
-      reserva_id: reservaId,
-      medio: p.medio,
-      monto: p.monto,
-      comprobante: p.comprobante || null
-    }))
   
   if (rowsPay.length) {
     const { error: ePay } = await supabase.from('pagos').insert(rowsPay)
@@ -186,7 +179,13 @@ export async function updateReservaEnBD(params: {
   // 5) log de modificación (para “Modificación” en visor)
   const { error: eLog } = await supabase
   .from('pagos')
-  .insert([{ reserva_id: reservaId, medio: 'transferencia', monto: 0, comprobante: `MOD: ${motivoMod}` }])
+  .insert([{
+    reserva_id: reservaId,
+    codigo: codigo,                       // ⬅️ AÑADIR
+    medio: 'transferencia',
+    monto: 0,
+    comprobante: `MOD: ${motivoMod}`
+  }])
 if (eLog) throw eLog
 
   return reservaId
