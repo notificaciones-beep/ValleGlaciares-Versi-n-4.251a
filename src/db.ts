@@ -102,3 +102,95 @@ export async function saveReservaEnBD(
 
   return reservaId
 }
+
+export async function updateReservaEnBD(params: {
+  codigo: string
+  fechaLSR: string | null
+  valorTransporte: number              // ver nota más abajo si guardas total vs p/p
+  descuentoLSR: number
+  servicioCM: 'FM' | 'CM' | null
+  fechaCM: string | null
+  proveedorCM: string | null
+  valorCMBruto: number                 // suma de cm_valor por pasajero
+  descuentoCM: number
+  observacionGrupo: string | null
+  motivoMod: string                    // texto del modal
+  pasajeros: Array<{
+    nombre: string
+    rut_pasaporte?: string | null
+    nacionalidad?: string | null
+    telefono?: string | null
+    email?: string | null
+    categoria: 'adulto' | 'nino' | 'infante'
+    cm_incluye: boolean
+  }>
+}) {
+  const {
+    codigo,
+    fechaLSR, valorTransporte, descuentoLSR,
+    servicioCM, fechaCM, proveedorCM, valorCMBruto, descuentoCM,
+    observacionGrupo, motivoMod,
+    pasajeros
+  } = params
+
+  // 1) localizar reserva
+  const { data: r, error: e1 } = await supabase
+    .from('reservas')
+    .select('id, observacion')
+    .eq('codigo', codigo)
+    .maybeSingle()
+  if (e1) throw e1
+  if (!r) throw new Error(`No existe reserva con código ${codigo}`)
+  const reservaId = r.id
+
+  // 2) anexar motivo a observación
+  const prefix = `[Mod ${new Date().toISOString().slice(0,10)}] `
+  const obsFinal = observacionGrupo && observacionGrupo.trim()
+    ? `${observacionGrupo.trim()}\n${prefix}${motivoMod.trim()}`
+    : `${prefix}${motivoMod.trim()}`
+
+  // 3) actualizar cabecera
+  const { error: e2 } = await supabase
+    .from('reservas')
+    .update({
+      fecha_lsr: fechaLSR,
+      valor_transporte: valorTransporte,
+      descuento_lsr: descuentoLSR,
+      servicio_cm: servicioCM,
+      fecha_cm: fechaCM,
+      proveedor: proveedorCM,
+      valor_cm: valorCMBruto,
+      descuento_cm: descuentoCM,
+      observacion: obsFinal
+    })
+    .eq('id', reservaId)
+  if (e2) throw e2
+
+  // 4) reemplazar pasajeros
+  const { error: eDel } = await supabase.from('pasajeros').delete().eq('reserva_id', reservaId)
+  if (eDel) throw eDel
+
+  const rows = pasajeros.map(p => ({
+    reserva_id: reservaId,
+    codigo,
+    nombre: p.nombre || null,
+    rut_pasaporte: p.rut_pasaporte || null,
+    nacionalidad: p.nacionalidad || null,
+    telefono: p.telefono || null,
+    email: p.email || null,
+    categoria: p.categoria,
+    cm_incluye: !!p.cm_incluye
+  }))
+  if (rows.length) {
+    const { error: eIns } = await supabase.from('pasajeros').insert(rows)
+    if (eIns) throw eIns
+  }
+
+  // 5) log de modificación (para “Modificación” en visor)
+  const { error: eLog } = await supabase
+    .from('pagos')
+    .insert([{ reserva_id: reservaId, id: codigo, medio: 'transferencia', monto: 0, comprobante: `MOD: ${motivoMod}` }])
+  if (eLog) throw eLog
+
+  return reservaId
+}

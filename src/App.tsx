@@ -314,7 +314,7 @@ useEffect(() => {
         // 3) Leer PAGOS de esas reservas
         const { data: pg, error: eG } = await supabase
         .from('pagos')
-        .select('id,reserva_id,medio,monto,created_at') // ← sin 'comprobante' para que nunca rompa
+        .select('id,reserva_id,medio,monto,comprobante,created_at') // ← ahora sí traemos comprobante
         .in('reserva_id', ids)
         if (eG) {
           console.error('[VG] leer pagos:', eG)

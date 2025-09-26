@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { BasePagosRow, BasePasajerosRow, CategoriaLSR, LocalDB } from '../types'
 import { nInt, nowISO, CLP } from '../utils'
+import { updateReservaEnBD } from '../db'   // ← NUEVO
 import { supabase } from '../supabaseClient'
 // tarifas y transporte entran por props (compat admin)
 
@@ -306,7 +307,7 @@ export default function Modificaciones(
   // Lógica central de guardado, recibe el motivo desde el diálogo
   async function guardarConMotivo(motivo: string){
     if(!rows.length){ alert('Carga un ID primero.'); return }
-
+  
     if(capillasTipo && rows.some(r => (r.cm_valor || 0) > 0) && !fechaCM){
       alert('Debes indicar la fecha de Capillas para guardar.')
       return
@@ -315,7 +316,7 @@ export default function Modificaciones(
       alert('Debes indicar un motivo de modificación.')
       return
     }
-
+  
     // Si cambió la fecha LSR, recalcular NG del grupo
     const orig = db.base_pasajeros.find(r=> r.id===loadedId)
     const origFecha = orig?.fecha_lsr || ''
@@ -323,10 +324,9 @@ export default function Modificaciones(
     if (fechaLSR && fechaLSR !== origFecha) {
       nuevoNG = nextGroupForDate(fechaLSR)
     }
-
-    // ---- CORRECCIÓN: transporte como 'si'|'no' tipado
+  
     const tr: 'si'|'no' = transporteSi ? 'si' : 'no'
-
+  
     const recalc = rows.map(r=>{
       const lsr_valor = rlsr(season, r.lsr_categoria)
       const transp_valor = transporteSi ? transportPerPerson : 0
@@ -348,18 +348,19 @@ export default function Modificaciones(
         fecha_cm: capillasTipo ? (fechaCM || '') : '',
         cm_valor: capillasTipo ? cm_valor : 0,
         cm_categoria: capillasTipo ? cm_categoria : '',
-        observaciones: observaciones || r.observaciones || '',
+        observaciones: (observaciones || r.observaciones || ''),
         lsr_valor,
         fecha_lsr: fechaLSR || ''
       }
     })
-
+  
+    // 1) Actualiza base local (UI inmediata)
     setDb(prev=>{
       const others = prev.base_pasajeros.filter(r=> r.id !== loadedId)
       return {...prev, base_pasajeros: [...others, ...recalc] }
     })
-
-    // Registrar “MOD: …” (monto 0)
+  
+    // Log local (hasta que llegue realtime)
     const mov: BasePagosRow = {
       createdAt: nowISO(),
       vendedor: vendedorActual,
@@ -369,69 +370,38 @@ export default function Modificaciones(
       comprobante: `MOD: ${motivo}`
     }
     setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, mov]}))
-
-    // === Persistencia en BD: reservas + pasajeros ===
+  
+    // 2) Sincroniza en Supabase
     try{
-      // 1) Obtener usuario y encontrar la reserva por su código (loadedId)
-      const { data: { user: u } } = await supabase.auth.getUser()
-      if(!u){ alert('No hay sesión iniciada. Inicia sesión e intenta de nuevo.'); return }
-
-      const { data: rsv, error: eFind } = await supabase
-        .from('reservas')
-        .select('id')
-        .eq('codigo', loadedId)
-        .maybeSingle()
-
-      if (eFind || !rsv?.id) {
-        alert('No se encontró la reserva en BD para este ID. ¿Se creó con “Ingresar reserva + correo”?')
-      } else {
-        // 2) Actualizar campos básicos de la reserva
-        const upd: any = {
-          fecha_lsr: fechaLSR || null,
-          descuento_lsr: dctoLSR || 0,
-          motivo_dcto_lsr: motivo || null,
-          // Capillas de Mármol (si aplica)
-          servicio_cm: capillasTipo || null,           // 'FM' | 'CM' | null
-          fecha_cm: capillasTipo ? (fechaCM || null) : null,
-          descuento_cm: dctoCM || 0,
-          proveedor: capillasTipo ? (proveedor || null) : null
-        }
-
-        const { error: eUpd } = await supabase
-          .from('reservas')
-          .update(upd)
-          .eq('id', rsv.id)
-
-        if (eUpd) throw eUpd
-
-        // 3) Reemplazar pasajeros (DELETE + INSERT)
-        const { error: eDelP } = await supabase
-          .from('pasajeros')
-          .delete()
-          .eq('reserva_id', rsv.id)
-        if (eDelP) throw eDelP
-
-        const rowsToInsert = rows.map(r => ({
-          reserva_id: rsv.id,
-          codigo: loadedId,
-          nombre: r.nombre || null,
+      const valorCMBruto = recalc.reduce((acc, r)=> acc + (r.cm_valor||0), 0)
+      await updateReservaEnBD({
+        codigo: loadedId,
+        fechaLSR: fechaLSR || null,
+        // si guardas TOTAL del grupo en reservas.valor_transporte, usa recalc.length * transportPerPerson
+        valorTransporte: transporteSi ? transportPerPerson : 0,
+        descuentoLSR: dctoLSR,
+        servicioCM: capillasTipo || null,
+        fechaCM: capillasTipo ? (fechaCM || null) : null,
+        proveedorCM: capillasTipo ? (proveedor || null) : null,
+        valorCMBruto,
+        descuentoCM: dctoCM,
+        observacionGrupo: (observaciones || '').trim() || null,
+        motivoMod: motivo,
+        pasajeros: recalc.map(r => ({
+          nombre: r.nombre,
           rut_pasaporte: r.doc || null,
           nacionalidad: r.nacionalidad || null,
           telefono: r.telefono || null,
           email: r.email || null,
-          categoria: r.lsr_categoria  // 'adulto' | 'nino' | 'infante'
+          categoria: r.lsr_categoria,
+          cm_incluye: !!(capillasTipo && (r.cm_valor||0) > 0)
         }))
-        if (rowsToInsert.length){
-          const { error: eInsP } = await supabase.from('pasajeros').insert(rowsToInsert)
-          if (eInsP) throw eInsP
-        }
-      }
-    } catch(e:any){
-      alert('No se pudo guardar los cambios en la BD: ' + (e?.message || e))
-      return
+      })
+      alert('Modificación guardada y sincronizada en BD.')
+    }catch(e:any){
+      console.error('[Modificaciones] updateReservaEnBD', e)
+      alert('Se guardó localmente, pero falló la sincronización con BD: ' + (e?.message || e))
     }
-    // === Fin persistencia en BD ===
-    alert('Modificación guardada.')
   }
 
   // === Persistencia en BD: eliminar pasajeros del grupo + log en pagos ===
