@@ -124,6 +124,32 @@ function minAvailableNumber(v: VendorKey, db: LocalDB) {
   return end
 }
 
+async function mirrorVendorOverridesFromDB() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data, error } = await supabase
+      .from('vendor_overrides')
+      .select('vendor_key,name,prefix,range_start,range_end')
+    if (error) throw error
+
+    const map: Record<string, Partial<{ name:string; prefix:string; start:number; end:number }>> = {}
+    for (const r of (data || [])) {
+      map[r.vendor_key] = {
+        name: r.name ?? undefined,
+        prefix: r.prefix ?? undefined,
+        start: r.range_start ?? undefined,
+        end: r.range_end ?? undefined,
+      }
+    }
+    // espejo -> localStorage + notificar
+    localStorage.setItem(LS_VENDOR_OVERRIDES, JSON.stringify(map))
+    window.dispatchEvent(new Event('storage'))
+  } catch (e) {
+    console.error('[VG] mirrorVendorOverridesFromDB:', e)
+  }
+}
+
 function codeFrom(v: VendorKey, n: number) {
   return `${getVendorMeta(v).prefix}${n}` // sin ceros a la izquierda
 }
@@ -207,6 +233,10 @@ export default function App(){
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas'  }, () => setRefreshTick(t => t + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pasajeros' }, () => setRefreshTick(t => t + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos'     }, () => setRefreshTick(t => t + 1))
+      // ⬇️ NUEVO: cuando cambien overrides en BD, refresca espejo local
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_overrides' }, () => {
+        mirrorVendorOverridesFromDB()
+      })
       .subscribe()
     return () => { try { supabase.removeChannel(ch) } catch {} }
   }, [authReady])
@@ -449,6 +479,12 @@ useEffect(() => {
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [])
+
+  // Tras estar lista la auth, baja overrides y espeja a localStorage
+useEffect(() => {
+  if (!authReady) return
+  mirrorVendorOverridesFromDB()
+}, [authReady])
 
   useEffect(()=>{
     if (tab==='visor' || tab==='mensual') {
