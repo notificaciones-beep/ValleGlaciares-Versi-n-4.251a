@@ -52,6 +52,7 @@ export async function saveReservaEnBD(
   if (Array.isArray(snap.pasajeros) && snap.pasajeros.length){
     const rows = snap.pasajeros.map((p:any)=>({
       reserva_id: reservaId,
+      codigo: snap.codigo,
       nombre: p.nombre ?? null,
       rut_pasaporte: p.rut ?? p.pasaporte ?? null,
       nacionalidad: p.nacionalidad ?? null,
@@ -64,9 +65,9 @@ export async function saveReservaEnBD(
     // 4) Si hay pagos iniciales, insertarlos en BD
   if (payments && payments.length) {
     const rowsPay = payments
-      .filter(p => (p.monto || 0) !== 0) // acepta positivos (pago) y negativos (reembolso)
       .map(p => ({
-        reserva_id: reserva.id,
+        reserva_id: reservaId,         // puedes dejar reserva.id si prefieres
+        codigo: snap.codigo,
         medio: p.medio,
         monto: p.monto,
         comprobante: p.comprobante || null

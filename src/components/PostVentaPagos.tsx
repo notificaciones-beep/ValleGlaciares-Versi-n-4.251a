@@ -53,19 +53,29 @@ export default function PostVentaPagos(
       if(!u) throw new Error('Sin sesión (Supabase)')
     
       // Buscar la reserva por su código escrito (found.id)
-      const { data: rsv, error: e1 } = await supabase
+      const code = (found?.id ?? '').toString().trim().toUpperCase();
+      if (!code) { alert('Ingresa un código válido.'); return; }
+      
+      // Buscar la reserva por su código y traer también el propio código
+      const { data: rsv, error: eFind } = await supabase
         .from('reservas')
-        .select('id')
-        .eq('codigo', found.id)
-        .maybeSingle()
-      if (e1 || !rsv?.id) { alert('No se encontró esa reserva en la BD. ¿La creaste con “Ingresar reserva + correo”?'); return }
+        .select('id,codigo')
+        .eq('codigo', code)
+        .maybeSingle();
+      
+      if (eFind || !rsv?.id) {
+        alert('No se encontró esa reserva en la BD. ¿La creaste con “Ingresar reserva + correo”?');
+        return;
+      }
     
-      const { error: e2 } = await supabase.from('pagos').insert({
+      const { error: eIns } = await supabase.from('pagos').insert({
         reserva_id: rsv.id,
+        codigo: rsv.codigo,           // <- requerido por tu esquema (NOT NULL)
         medio, monto,
         comprobante: comprobante || null
-      })
-      if (e2) throw e2
+      });
+      if (eIns) throw eIns;
+
     } catch(e:any){
       alert('No se pudo guardar el pago en la BD: ' + (e?.message || e))
       return

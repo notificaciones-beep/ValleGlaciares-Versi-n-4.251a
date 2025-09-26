@@ -413,6 +413,7 @@ export default function Modificaciones(
 
         const rowsToInsert = rows.map(r => ({
           reserva_id: rsv.id,
+          codigo: loadedId,
           nombre: r.nombre || null,
           rut_pasaporte: r.doc || null,
           nacionalidad: r.nacionalidad || null,
@@ -478,6 +479,7 @@ export default function Modificaciones(
         // 2) Insertar movimiento 0 en pagos (log de eliminación)
         const { error: eInsPay } = await supabase.from('pagos').insert({
           reserva_id: rsv.id,
+          codigo: loadedId,
           medio: 'modificacion',
           monto: 0,
           comprobante: `DEL: ${motivoDelete}`
