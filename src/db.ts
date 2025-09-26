@@ -75,7 +75,8 @@ export async function saveReservaEnBD(
       nacionalidad: p.nacionalidad ?? null,
       telefono: p.telefono ?? null,
       email: p.email ?? null,
-      categoria: p.categoria // 'adulto' | 'nino' | 'infante'
+      categoria: p.categoria, // 'adulto' | 'nino' | 'infante'
+      cm_incluye: !!p.capillas             // ⬅️ NUEVO: persistimos si ese pasajero lleva CM
     }))
     const { error: e2 } = await supabase.from('pasajeros').insert(rows)
     if (e2) throw e2

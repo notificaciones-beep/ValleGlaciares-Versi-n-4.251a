@@ -302,9 +302,9 @@ useEffect(() => {
   
         // 2) Leer PASAJEROS de esas reservas
         const { data: ps, error: eP } = await supabase
-          .from('pasajeros')
-          .select('id,reserva_id,nombre,rut_pasaporte,nacionalidad,telefono,email,categoria')
-          .in('reserva_id', ids)
+        .from('pasajeros')
+        .select('id,reserva_id,nombre,rut_pasaporte,nacionalidad,telefono,email,categoria,cm_incluye')
+        .in('reserva_id', ids)
         if (eP) {
           console.error('[VG] leer pasajeros:', eP)
           alert('No se pudieron leer pasajeros: ' + (eP.message || JSON.stringify(eP)))
@@ -387,11 +387,31 @@ useEffect(() => {
               lsr_valor,
               transp_valor: (r.valor_transporte||0) > 0 ? perPersonT : 0,
               lsr_descuento: r.descuento_lsr || 0,
-              cm_categoria: '',
-              proveedor: r.proveedor || '',
-              fecha_cm: r.fecha_cm || '',
-              cm_valor: 0, // total por reserva -> lo dejamos 0 por pasajero
-              cm_descuento: r.descuento_cm || 0,
+              ...(() => {
+                const incluye = !!p.cm_incluye;
+                const tipo = r.servicio_cm as ('FM'|'CM'|null);
+                if (!tipo || !incluye) {
+                  return {
+                    cm_categoria: '',
+                    proveedor: r.proveedor || '',
+                    fecha_cm: r.fecha_cm || '',
+                    cm_valor: 0,
+                    cm_descuento: r.descuento_cm || 0,
+                  };
+                }
+                const promoRates = effectiveConf.ratesPromo[tipo]; // {adulto,nino,infante}
+                const val = p.categoria === 'adulto' ? promoRates.adulto
+                          : p.categoria === 'nino'   ? promoRates.nino
+                          :                             promoRates.infante;
+                const cm_cat: 'adulto'|'infante' = (p.categoria === 'adulto') ? 'adulto' : 'infante';
+                return {
+                  cm_categoria: cm_cat,
+                  proveedor: r.proveedor || '',
+                  fecha_cm: r.fecha_cm || '',
+                  cm_valor: val,
+                  cm_descuento: r.descuento_cm || 0,
+                };
+              })(),
               observaciones: r.observacion || '',
               fecha_lsr: r.fecha_lsr || ''
             })
