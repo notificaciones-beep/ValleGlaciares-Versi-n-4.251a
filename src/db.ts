@@ -71,7 +71,7 @@ export async function saveReservaEnBD(
       reserva_id: reservaId,
       codigo: snap.codigo,
       nombre: p.nombre ?? null,
-      rut_pasaporte: p.rut ?? p.pasaporte ?? null,
+      rut_pasaporte: p.doc ?? p.rut ?? p.pasaporte ?? null,
       nacionalidad: p.nacionalidad ?? null,
       telefono: p.telefono ?? null,
       email: p.email ?? null,

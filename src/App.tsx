@@ -286,8 +286,8 @@ useEffect(() => {
   
         // 1) Leer RESERVAS (sin relaciones anidadas)
         const { data: rs, error: eR } = await supabase
-          .from('reservas')
-          .select('id,codigo,vendedor_uid,fecha_lsr,valor_transporte,descuento_lsr,proveedor,servicio_cm,fecha_cm,valor_cm,descuento_cm,created_at')
+        .from('reservas')
+        .select('id,codigo,vendedor_uid,fecha_lsr,valor_transporte,descuento_lsr,proveedor,servicio_cm,fecha_cm,valor_cm,descuento_cm,observacion,created_at')
         if (eR) {
           console.error('[VG] leer reservas:', eR)
           alert('No se pudieron leer reservas: ' + (eR.message || JSON.stringify(eR)))
@@ -392,7 +392,7 @@ useEffect(() => {
               fecha_cm: r.fecha_cm || '',
               cm_valor: 0, // total por reserva -> lo dejamos 0 por pasajero
               cm_descuento: r.descuento_cm || 0,
-              observaciones: '',
+              observaciones: r.observacion || '',
               fecha_lsr: r.fecha_lsr || ''
             })
           }
