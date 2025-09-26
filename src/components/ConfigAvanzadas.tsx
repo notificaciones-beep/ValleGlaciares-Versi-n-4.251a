@@ -203,6 +203,7 @@ function loadVendorOverrides(): VendorOverridesMap {
 function saveVendorOverrides(map: VendorOverridesMap){
   localStorage.setItem(LS_VENDOR_OVERRIDES, JSON.stringify(map))
   window.dispatchEvent(new Event('vg:config-updated'))
+  window.dispatchEvent(new Event('vg:overrides-updated'))   // <— AÑADIR ESTA LÍNEA
 }
 
 async function loadConfigFromDB() {

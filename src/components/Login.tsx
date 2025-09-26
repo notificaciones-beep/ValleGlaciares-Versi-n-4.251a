@@ -40,9 +40,22 @@ export default function Login({onLogin, getPwd}:{onLogin:(v:string)=>void, getPw
 
   const [, force] = React.useReducer(x => x + 1, 0)
   React.useEffect(() => {
-    const onStorage = () => force()
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    const refresh = () => force()
+
+    // 1) Refrescar una vez poco después del montaje
+    const t = setTimeout(refresh, 400)
+
+    // 2) Escuchar todas las señales relevantes
+    window.addEventListener('storage', refresh)                // espejo desde DB (App)
+    window.addEventListener('vg:overrides-updated', refresh)   // evento explícito de overrides
+    window.addEventListener('vg:config-updated', refresh)      // guardado desde ConfigAvanzadas
+
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('storage', refresh)
+      window.removeEventListener('vg:overrides-updated', refresh)
+      window.removeEventListener('vg:config-updated', refresh)
+    }
   }, [])
 
   function submit(e:React.FormEvent){
