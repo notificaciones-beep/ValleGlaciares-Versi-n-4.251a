@@ -257,12 +257,27 @@ async function replaceAllOverridesInDB(overrides: Record<string, Partial<{ name:
     .upsert(rows, { onConflict: 'vendor_key' })
   if (error) throw error
 }
-
 /** ────────────────────────────────────────────────────────────────────────────
  *  Subcomponente: Perfiles (existentes)
  *  ───────────────────────────────────────────────────────────────────────── */
 function PerfilesExistentes(){
   const [overrides, setOverrides] = React.useState<VendorOverridesMap>(loadVendorOverrides())
+  React.useEffect(() => {
+    const refresh = () => setOverrides(loadVendorOverrides())
+    // Pequeño empujón inicial por si el espejo aún no termina
+    const t = setTimeout(refresh, 300)
+
+    window.addEventListener('storage', refresh)
+    window.addEventListener('vg:overrides-updated', refresh)
+    window.addEventListener('vg:config-updated', refresh)
+
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('storage', refresh)
+      window.removeEventListener('vg:overrides-updated', refresh)
+      window.removeEventListener('vg:config-updated', refresh)
+    }
+  }, [])
 
   // Base restringida: SOLO 'javier' si existe en VENDORS
   const baseKeys = (Object.prototype.hasOwnProperty.call(VENDORS, 'javier') ? ['javier'] : [])

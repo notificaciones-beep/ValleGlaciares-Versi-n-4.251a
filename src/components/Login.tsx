@@ -42,16 +42,17 @@ export default function Login({onLogin, getPwd}:{onLogin:(v:string)=>void, getPw
   React.useEffect(() => {
     const refresh = () => force()
 
-    // 1) Refrescar una vez poco después del montaje
-    const t = setTimeout(refresh, 400)
+    // Refrescos iniciales por si el espejo desde Supabase tarda
+    const t1 = setTimeout(refresh, 400)
+    const t2 = setTimeout(refresh, 1500)
 
-    // 2) Escuchar todas las señales relevantes
-    window.addEventListener('storage', refresh)                // espejo desde DB (App)
-    window.addEventListener('vg:overrides-updated', refresh)   // evento explícito de overrides
-    window.addEventListener('vg:config-updated', refresh)      // guardado desde ConfigAvanzadas
+    // Escuchar todas las señales relevantes
+    window.addEventListener('storage', refresh)                // espejo local manual
+    window.addEventListener('vg:overrides-updated', refresh)   // overrides actualizados
+    window.addEventListener('vg:config-updated', refresh)      // cambios de config que tocan vendors
 
     return () => {
-      clearTimeout(t)
+      clearTimeout(t1); clearTimeout(t2)
       window.removeEventListener('storage', refresh)
       window.removeEventListener('vg:overrides-updated', refresh)
       window.removeEventListener('vg:config-updated', refresh)
