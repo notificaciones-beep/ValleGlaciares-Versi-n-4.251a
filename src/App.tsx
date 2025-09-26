@@ -145,6 +145,8 @@ async function mirrorVendorOverridesFromDB() {
     // espejo -> localStorage + notificar
     localStorage.setItem(LS_VENDOR_OVERRIDES, JSON.stringify(map))
     window.dispatchEvent(new Event('storage'))
+    // ⬇️ NUEVO: evento explícito para que la UI “escuche” el refresco
+    window.dispatchEvent(new Event('vg:overrides-updated'))
   } catch (e) {
     console.error('[VG] mirrorVendorOverridesFromDB:', e)
   }
@@ -225,6 +227,26 @@ export default function App(){
     )
     return () => { sub.subscription?.unsubscribe?.() }
   }, [])
+
+  // 🔔 Versión de overrides para forzar re-montar VendorLogin cuando cambien
+const [vendorsVersion, setVendorsVersion] = useState(0)
+
+// Sube tick cuando llegue nuestro evento custom
+useEffect(() => {
+  const onUpdated = () => setVendorsVersion(v => v + 1)
+  window.addEventListener('vg:overrides-updated', onUpdated)
+  return () => window.removeEventListener('vg:overrides-updated', onUpdated)
+}, [])
+
+// Sube tick también ante cualquier “storage” (por si hay otros módulos que escriben)
+useEffect(() => {
+  const onStorage = (e: any) => {
+    // si filtras por clave, usa: if (e?.key && e.key !== LS_VENDOR_OVERRIDES) return;
+    setVendorsVersion(v => v + 1)
+  }
+  window.addEventListener('storage', onStorage)
+  return () => window.removeEventListener('storage', onStorage)
+}, [])
   
   // 2) Suscripción Realtime (se activa cuando authReady === true)
   useEffect(() => {
@@ -504,14 +526,15 @@ useEffect(() => {
   : (!user
       ? <AuthLogin />
       : (!loggedVendor
-          ? (
-            <VendorLogin
-              onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
-              getPwd={getPwd}
-            />
-          )
-          : null
+        ? (
+          <VendorLogin
+          key={`vendorlogin-${vendorsVersion}`}  // ⬅️ fuerza re-montaje al cambiar overrides
+          onLogin={(v)=>{ setLoggedVendor(v as VendorKey) }}
+          getPwd={getPwd}
+        />
         )
+        : null
+      )
     );
 
 
