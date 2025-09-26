@@ -55,6 +55,11 @@ async function fetchOverridesFromDB(): Promise<OverridesMap> {
 export default function VendorLogin({ onLogin, getPwd }: Props) {
   const [options, setOptions] = React.useState<{ key:string, label:string }[]>([])
   const [vendor, setVendor] = React.useState<string>('javier')
+  React.useEffect(() => {
+    if (!options.length) return
+    const exists = options.some(o => o.key === vendor)
+    if (!exists) setVendor(options[0].key)
+  }, [options, vendor])
   const [pwd, setPwd] = React.useState('')
   const [err, setErr] = React.useState('')
   const [loading, setLoading] = React.useState(true)
@@ -78,6 +83,9 @@ export default function VendorLogin({ onLogin, getPwd }: Props) {
         // Guardamos también en localStorage para otras pantallas/pestañas
         localStorage.setItem(LS_VENDOR_OVERRIDES, JSON.stringify(fresh))
         const merged = mergeBaseAndOverrides(fresh)
+        if (Object.keys(merged).length === 0) {
+          merged.javier = { name: 'Admin', prefix: 'A', start: 1, end: 1000 }
+        }
         if (!cancelled) {
           setOptions(Object.entries(merged).map(([k,v]) => ({ key:k, label:v.name || k })))
           setLoading(false)
@@ -138,8 +146,15 @@ export default function VendorLogin({ onLogin, getPwd }: Props) {
         <div style={{display:'grid', gap:8}}>
           <div>
             <label>Usuario</label>
-            <select value={vendor} onChange={e=>setVendor(e.target.value)}>
-              {options.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+            <select
+            value={options.length ? vendor : ''}
+            onChange={e=> setVendor(e.target.value)}
+            disabled={loading && options.length===0}
+            >
+              {options.length === 0
+              ? <option value="">Cargando…</option>
+              : options.map(o => <option key={o.key} value={o.key}>{o.label}</option>)
+            }
             </select>
           </div>
           <div>
