@@ -579,7 +579,7 @@ useEffect(() => {
     lsrDcto: lsrDctoAplicado,
     transporte: transporteTotal,
     totalLSR: totalLSRConTransporte,
-    promoTipo,
+    promoTipo,                 // 'FM' | 'CM' | undefined
     promoSubtotal,
     promoDcto: promoDctoAplicado,
     totalPromo: promoTotal,
