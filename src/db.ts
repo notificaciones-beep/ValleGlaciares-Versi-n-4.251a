@@ -69,6 +69,7 @@ export async function saveReservaEnBD(
   if (Array.isArray(snap.pasajeros) && snap.pasajeros.length){
     const rows = snap.pasajeros.map((p:any)=>({
       reserva_id: reservaId,
+      codigo: snap.codigo,                 // ⬅️ REINSTALAR ESTE CAMPO (NOT NULL)
       nombre: p.nombre ?? null,
       rut_pasaporte: p.doc ?? p.rut ?? p.pasaporte ?? null,
       nacionalidad: p.nacionalidad ?? null,
@@ -168,6 +169,7 @@ export async function updateReservaEnBD(params: {
 
   const rows = pasajeros.map(p => ({
     reserva_id: reservaId,
+    codigo: codigo,                      // ⬅️ REINSTALAR ESTE CAMPO (NOT NULL)
     nombre: p.nombre || null,
     rut_pasaporte: p.rut_pasaporte || null,
     nacionalidad: p.nacionalidad || null,
