@@ -251,24 +251,21 @@ useEffect(() => {
   // 2) Suscripción Realtime (se activa cuando authReady === true)
   useEffect(() => {
     if (!authReady) return
-    const ch = supabase.channel('db-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas'  }, () => setRefreshTick(t => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pasajeros' }, () => setRefreshTick(t => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos'     }, () => setRefreshTick(t => t + 1))
-      // ⬇️ NUEVO: cuando cambien overrides en BD, refresca espejo local
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_overrides' }, () => {
-        mirrorVendorOverridesFromDB()
-      })
+    const onChange = () => {
+      // Actualiza espejo local desde DB (ya tienes esta función definida arriba)
+      mirrorVendorOverridesFromDB()
+    }
+    const chVendors = supabase.channel('db-updates-vendors')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_overrides' }, onChange)
       .subscribe()
-    return () => { try { supabase.removeChannel(ch) } catch {} }
+    return () => { try { supabase.removeChannel(chVendors) } catch {} }
   }, [authReady])
-
-  const [passwords, setPasswords] = useState<Record<VendorKey,string>>(
-    loadJSON<Record<VendorKey,string>>(LS_PASSWORDS, DEFAULT_PASSWORDS)
-  )
 
   const [db, setDb] = useState<LocalDB>(
     loadJSON<LocalDB>(LS_DB, { base_pasajeros:[], base_pagos:[], history:[] })
+  )
+  const [passwords, setPasswords] = useState<Record<string,string>>(
+    loadJSON<Record<string,string>>(LS_PASSWORDS, { ...DEFAULT_PASSWORDS })
   )
   useEffect(()=> saveJSON(LS_PASSWORDS, passwords), [passwords])
   useEffect(()=> saveJSON(LS_DB, db), [db])

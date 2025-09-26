@@ -1,82 +1,153 @@
-import React, { useState } from 'react'
+// src/components/Login.tsx
+import React from 'react'
+import { supabase } from '../supabaseClient'
 import { VendorKey } from '../types'
-import { DEFAULT_PASSWORDS, VENDORS } from '../state'
+import { DEFAULT_PASSWORDS } from '../state'
 
 const LS_VENDOR_OVERRIDES = 'vg_vendor_overrides'
-function getEffectiveVendors(){
-  const raw = localStorage.getItem(LS_VENDOR_OVERRIDES)
-  let overrides: Record<string, Partial<{ name:string; prefix:string; start:number; end:number }>> = {}
-  try {
-    overrides = raw ? (JSON.parse(raw) || {}) : {}
-  } catch {
-    // si hay basura en localStorage, ignoramos y seguimos con {}
-    overrides = {}
-  }
-  // Base: SOLO 'javier' (que mostraremos como Admin por defecto)
-  const merged: Record<string, { name:string; prefix:string; start:number; end:number }> = {} as any
-  if ((VENDORS as any)['javier']) {
-    merged['javier'] = { ...(VENDORS as any)['javier'] }
-  }
-  // renombre por defecto: si no hay override para 'javier', mostrar 'Admin'
-  if (!overrides['javier']) overrides['javier'] = { name: 'Admin' }
 
-  // aplicar overrides y AGREGAR NUEVOS (solo vienen de overrides, no del resto de VENDORS)
-  for (const [key, ov] of Object.entries(overrides)) {
-    const base = merged[key] || { name: key, prefix: (key[0]||'X').toUpperCase(), start: 1, end: 999 }
-    merged[key] = { ...base, ...ov }
+type Props = {
+  onLogin: (v: string) => void
+  getPwd: (v: string) => string
+}
+
+type Override = Partial<{ name:string; prefix:string; start:number; end:number }>
+type OverridesMap = Record<string, Override>
+
+function mergeBaseAndOverrides(overrides: OverridesMap) {
+  // Base MUY restrictiva: sólo 'javier' visible como "Admin"
+  const base: Record<string, { name:string; prefix:string; start:number; end:number }> = {
+    javier: { name:'Admin', prefix:'A', start:1, end:1000 },
+  }
+
+  const merged: Record<string, { name:string; prefix:string; start:number; end:number }> = { ...base }
+  for (const [key, ov] of Object.entries(overrides || {})) {
+    if (!key) continue
+    merged[key] = {
+      name:  ov.name   ?? merged[key]?.name   ?? key,
+      prefix:ov.prefix ?? merged[key]?.prefix ?? 'X',
+      start: ov.start  ?? merged[key]?.start  ?? 1,
+      end:   ov.end    ?? merged[key]?.end    ?? 1000,
+    }
   }
   return merged
 }
 
+async function fetchOverridesFromDB(): Promise<OverridesMap> {
+  const { data, error } = await supabase
+    .from('vendor_overrides')
+    .select('vendor_key,name,prefix,range_start,range_end')
 
-export default function Login({onLogin, getPwd}:{onLogin:(v:string)=>void, getPwd:(v:string)=>string}){
-  const initialVendor = (() => {
-    const keys = Object.keys(getEffectiveVendors())
-    return keys[0] || 'javier'
-  })()
-  const [vendor, setVendor] = useState<string>(initialVendor)
-  const [pwd, setPwd] = useState('')
-  const [err, setErr] = useState('')
+  if (error) throw error
 
-  const [, force] = React.useReducer(x => x + 1, 0)
+  const map: OverridesMap = {}
+  for (const r of (data || [])) {
+    map[r.vendor_key] = {
+      name: r.name ?? undefined,
+      prefix: r.prefix ?? undefined,
+      start: (r as any).range_start ?? undefined,
+      end: (r as any).range_end ?? undefined,
+    }
+  }
+  return map
+}
+
+export default function VendorLogin({ onLogin, getPwd }: Props) {
+  const [options, setOptions] = React.useState<{ key:string, label:string }[]>([])
+  const [vendor, setVendor] = React.useState<string>('javier')
+  const [pwd, setPwd] = React.useState('')
+  const [err, setErr] = React.useState('')
+  const [loading, setLoading] = React.useState(true)
+
+  // Carga inicial: intenta localStorage y luego DB
   React.useEffect(() => {
-    const onStorage = () => force()
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        // 1) Arranque rápido desde localStorage (si hay)
+        let ls: OverridesMap = {}
+        try { ls = JSON.parse(localStorage.getItem(LS_VENDOR_OVERRIDES) || '{}') } catch {}
+        const startMerged = mergeBaseAndOverrides(ls)
+        if (!cancelled) {
+          setOptions(Object.entries(startMerged).map(([k,v]) => ({ key:k, label:v.name || k })))
+        }
+
+        // 2) Fuente de verdad: DB
+        const fresh = await fetchOverridesFromDB()
+        // Guardamos también en localStorage para otras pantallas/pestañas
+        localStorage.setItem(LS_VENDOR_OVERRIDES, JSON.stringify(fresh))
+        const merged = mergeBaseAndOverrides(fresh)
+        if (!cancelled) {
+          setOptions(Object.entries(merged).map(([k,v]) => ({ key:k, label:v.name || k })))
+          setLoading(false)
+        }
+
+        // Disparo eventos para que otros se enteren
+        window.dispatchEvent(new Event('storage'))
+        window.dispatchEvent(new Event('vg:overrides-updated'))
+
+      } catch (e) {
+        console.error('[VendorLogin] fetch overrides failed:', e)
+        setLoading(false)
+      }
+    }
+
+    load()
+
+    // Re-fetch al volver a la pestaña
+    const onFocus = () => load()
+    const onVis = () => { if (!document.hidden) load() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVis)
+
+    // Escucho eventos internos de la app para refrescar
+    const onKick = () => load()
+    window.addEventListener('vg:overrides-updated', onKick)
+    window.addEventListener('storage', onKick)
+
+    // Realtime: si cambian overrides en DB, refrescar
+    const ch = supabase.channel('rt-vendor-overrides')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_overrides' }, onKick)
+      .subscribe()
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('vg:overrides-updated', onKick)
+      window.removeEventListener('storage', onKick)
+      try { supabase.removeChannel(ch) } catch {}
+    }
   }, [])
 
-  function submit(e:React.FormEvent){
+  function submit(e: React.FormEvent) {
     e.preventDefault()
-    if(pwd.trim() === getPwd(vendor)){
-      localStorage.setItem('vg_vendor', vendor)
-      onLogin(vendor)
-    }else setErr('Contraseña incorrecta.')
+    setErr('')
+    if (!vendor) { setErr('Selecciona un usuario'); return }
+    const ok = pwd.trim() === getPwd(vendor as VendorKey)
+    if (!ok) { setErr('Contraseña incorrecta'); return }
+    localStorage.setItem('vg_vendor', vendor)
+    onLogin(vendor)
   }
 
   return (
-    <div style={{display:'grid',placeItems:'center',minHeight:'100vh',padding:16}}>
-      <form style={{maxWidth:680,width:'100%',border:'1px solid #e5e7eb',borderRadius:12}} onSubmit={submit}>
-        <div style={{padding:16}}>
-          <h1 style={{marginTop:0}}>Ingresar</h1>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <div>
-              <label>Vendedor</label>
-              <select value={vendor} onChange={e=>setVendor(e.target.value)}>
-              {Object.entries(getEffectiveVendors()).map(([key, meta]) => (
-                <option key={key} value={key}>
-                  {meta.name} ({meta.prefix}{String(meta.start).padStart(4,'0')}–{meta.prefix}{String(meta.end).padStart(4,'0')})
-                  </option>
-                  ))}
-                  </select>
-                
-                
-            </div>
-            <div>
-              <label>Contraseña (demo: 1234)</label>
-              <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)} placeholder="••••" />
-            </div>
+    <div style={{padding:20, fontFamily:'system-ui', maxWidth:480}}>
+      <h2>Selecciona tu usuario</h2>
+      <form onSubmit={submit}>
+        <div style={{display:'grid', gap:8}}>
+          <div>
+            <label>Usuario</label>
+            <select value={vendor} onChange={e=>setVendor(e.target.value)}>
+              {options.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
           </div>
-          {err && <div style={{marginTop:10,color:'#b91c1c'}}>{err}</div>}
+          <div>
+            <label>Contraseña (demo: 1234)</label>
+            <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)} placeholder="••••" />
+          </div>
+          {loading && <div style={{opacity:.6}}>Cargando usuarios…</div>}
+          {err && <div style={{marginTop:6,color:'#b91c1c'}}>{err}</div>}
           <div style={{marginTop:12}}>
             <button type="submit">Entrar</button>
           </div>
