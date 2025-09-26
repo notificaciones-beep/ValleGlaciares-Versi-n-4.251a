@@ -19,11 +19,11 @@ import { correoReservaHTML } from './emailTemplates'
 import { dialogStyle, overlayStyle } from './styles'
 import { LS_VISOR_FECHA } from './state'
 import ConfigAvanzadas from './components/ConfigAvanzadas'
-import { saveReservaEnBD, savePreReservaEnBD } from './db'
 import ErrorBoundary from './ErrorBoundary'
 // al inicio:
 import { sendReservationEmails } from './email'
 import SafeMount from './components/SafeMount'  // ⬅️ agrega este import
+import { saveReservaEnBD } from './db'
 // === Registry de códigos retirados (no reutilizables) ===
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
 
@@ -650,28 +650,6 @@ useEffect(() => {
   
     const idCode = pickCodeForCommit(loggedVendor!, db, currentCode)
   
-    pushBasePasajeros('pre-reserva', idCode)
-    pushBasePagos(idCode)
-    const snap = snapshotVoucher(idCode); pushHistory(idCode, snap)
-    // === Persistir en BD la PRE-RESERVA ===
-    try{
-      const { data: { user: u } } = await supabase.auth.getUser()
-      if (!u) throw new Error('Sin sesión de Supabase')
-      await savePreReservaEnBD({
-        codigo: idCode,
-        fecha_lsr: fechaLSR || null,
-        cant_adulto: cantAdulto,
-        cant_nino: cantNino,
-        cant_infante: cantInfante,
-        incluye_transporte: incluyeTransporte,
-      }, u.id)
-    } catch(e:any){
-      console.error('[VG] pre-reserva BD', e)
-      const msg = e?.message || e?.error_description || e?.hint || (e?.code ? `Error ${e.code}` : '') || JSON.stringify(e)
-      alert(`Pre-reserva ingresada, pero no se pudo guardar en la base de datos.\n\nDetalle: ${msg}`)
-
-    }
-
     alert(`Pre-reserva ingresada: ${idCode}\n\nGrupo asignado para ${fechaLSR}: ${nextGroupForDate(fechaLSR)}`)
     beginNewSaleWithUniqueCode(loggedVendor!)
   }
