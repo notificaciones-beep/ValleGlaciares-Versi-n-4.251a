@@ -21,6 +21,7 @@ export interface VoucherData {
   transporte: number
   totalLSR: number
   promoTipo?: 'FM' | 'CM'
+  proveedor?: string    
   promoSubtotal: number
   promoDcto: number
   totalPromo: number

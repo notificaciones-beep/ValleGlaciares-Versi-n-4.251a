@@ -40,11 +40,11 @@ export async function saveReservaEnBD(
       motivo_dcto_lsr: (snap as any).motivoDctoLSR ?? null,
 
       // Proveedor Capillas
-      proveedor: proveedorCM,
+      proveedor: servicioCM ? proveedorCM : null,
 
       // Capillas de Mármol
       servicio_cm: servicioCM,                         // 'FM' | 'CM' | null
-      fecha_cm: fechaCM,
+      fecha_cm: servicioCM ? fechaCM : null,
       valor_cm: snap.promoSubtotal ?? 0,
       descuento_cm: snap.promoDcto ?? 0,
       motivo_dcto_cm: (snap as any).motivoDctoCM ?? null,
