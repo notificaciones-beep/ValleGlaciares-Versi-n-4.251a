@@ -223,12 +223,11 @@ async function saveConfigToDB(payload: {
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   const { error } = await supabase.from('config_admin').insert({
-        ...payload,
+    ...payload,
     updated_by: user?.id ?? null
   })
   if (error) throw error
 }
-
 
 async function loadOverridesFromDB() {
   const { data, error } = await supabase
