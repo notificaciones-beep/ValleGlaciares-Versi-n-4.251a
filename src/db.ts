@@ -83,7 +83,13 @@ export async function saveReservaEnBD(
   }
   
   // 3) Si hay pagos iniciales, insertarlos en BD
-  const rowsPay = (payments ?? [])
+  const rowsPay = (payments ?? []).map(p => ({
+    reserva_id: reservaId,
+    codigo: snap.codigo,
+    medio: p.medio,
+    monto: p.monto,
+    comprobante: (p.comprobante ?? null)
+  }))
   
   if (rowsPay.length) {
     const { error: ePay } = await supabase.from('pagos').insert(rowsPay)
