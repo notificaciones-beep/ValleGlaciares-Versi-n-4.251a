@@ -357,7 +357,7 @@ useEffect(() => {
   const [proveedor, setProveedor] = useState<string|undefined>(undefined)
   const [descuentoPromo, setDescuentoPromo] = useState(0)
   const [refreshTick, setRefreshTick] = useState(0)
-  const [payments, setPayments] = useState<{ medio:MedioPago, monto:number, comprobante?:string }[]>([{ medio:'efectivo', monto:0, comprobante:'' }])
+  const [payments, setPayments] = useState<{ medio:MedioPago, monto:number, comprobante?:string }[]>([{ medio:'asd123', monto:0, comprobante:'' }])
   const [observaciones, setObservaciones] = useState('')
   const [pasajeros, setPasajeros] = useState<Passenger[]>([])
 
