@@ -95,6 +95,8 @@ export default function VentaView(props:Props){
     }
   }, [pasajeros[0]?.email, pasajeros.length])
 
+  
+  
   // Para asegurar que al crear nuevos pasajeros hereden el email del 1°
   // CORRECCIÓN: setPasajeros recibe el ARRAY final (no updater).
   useEffect(()=>{
@@ -106,6 +108,28 @@ export default function VentaView(props:Props){
       setPasajeros(next)
     }
   }, [totalPersonas])
+
+  useEffect(() => {
+    const KEY = 'vg_preload_fecha_lsr'
+    // 1) Al montar, si hay una fecha en localStorage, úsala
+    const v = localStorage.getItem(KEY)
+    if (v) {
+      // Si manejas un objeto "snap":
+      setFechaLSR(v)
+      // Si en tu caso manejas un estado "fechaLSR" suelto, usa: setFechaLSR(v)
+      localStorage.removeItem(KEY)
+    }
+    // 2) Si ya está montada y llega un evento, también actualizar
+    const onPreload = (e: any) => {
+      const d = e?.detail?.fechaLSR
+      if (d) {
+        setFechaLSR(d)
+        // o setFechaLSR(d) si usas un estado específico
+      }
+    }
+    window.addEventListener('vg:venta-preload-fecha', onPreload as EventListener)
+    return () => window.removeEventListener('vg:venta-preload-fecha', onPreload as EventListener)
+  }, [])
 
   return (
     <div style={{display:'grid', gridTemplateColumns:'1fr 380px', gap:12}}>

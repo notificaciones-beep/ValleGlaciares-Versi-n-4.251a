@@ -224,11 +224,33 @@ export default function VisorDiario({db, computeSummaryForId, onClickId}:{db:Loc
     })
     downloadCSV(`visor_diario_${fecha}.csv`, rows)
   }
-
+  // Fecha actualmente mostrada en el visor (usar la misma variable del input date)
+  const fechaLSRActual = (fecha || '').slice(0,10)
+function goCrearReservaEnEsteDia(){
+  // Guardar la fecha para que VentaView la lea al montar
+  if (fechaLSRActual) {
+    localStorage.setItem('vg_preload_fecha_lsr', fechaLSRActual)
+  }
+  // Pedir al App que navegue a "Ingreso de venta"
+  window.dispatchEvent(new CustomEvent('vg:go-crear-reserva', { detail: { fechaLSR: fechaLSRActual } }))
+}  
   return (
     <div style={{display:'grid', gap:12}}>
       <div style={{border:'1px solid #e5e7eb', borderRadius:10}}><div style={{padding:12}}>
-        <h2 style={{marginTop:0}}>Visor diario</h2>
+      <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
+  <h2 style={{margin:0}}>Visor diario</h2>
+  <button
+    type="button"
+    onClick={goCrearReservaEnEsteDia}
+    style={{
+      fontSize:12, padding:'6px 10px', borderRadius:8, border:'1px solid #ccc',
+      background:'#fff', cursor:'pointer'
+    }}
+    title="Ir a Ingreso de venta con esta fecha"
+  >
+    Generar reserva en este día
+  </button>
+</div>
         <div style={{display:'flex', gap:8, alignItems:'end', flexWrap:'wrap'}}>
           <div>
             <label>Fecha LSR</label><br/>

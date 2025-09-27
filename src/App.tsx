@@ -25,6 +25,8 @@ import { sendReservationEmails } from './email'
 import SafeMount from './components/SafeMount'  // ⬅️ agrega este import
 import { saveReservaEnBD } from './db'
 // === Registry de códigos retirados (no reutilizables) ===
+// Navegación desde Visor Diario → Ingreso de venta con fecha precargada
+
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
 
 
@@ -271,6 +273,22 @@ useEffect(() => {
   }
   window.addEventListener('storage', onStorage)
   return () => window.removeEventListener('storage', onStorage)
+}, [])
+
+useEffect(() => {
+  const onGoCrear = (ev: any) => {
+    const fechaLSR = ev?.detail?.fechaLSR || localStorage.getItem('vg_preload_fecha_lsr') || null
+    if (fechaLSR) {
+      localStorage.setItem('vg_preload_fecha_lsr', fechaLSR) // asegurar valor
+    }
+    // ⬇⬇⬇ REEMPLAZA ESTA LÍNEA POR TU SETTER/LOGICA ACTUAL PARA MOSTRAR VentaView
+    // Ejemplos según tu app: setTab('venta')  |  setVista('venta')  |  setModulo('venta')
+    setTab('venta')
+    // Notificar a VentaView por si ya está montada
+    window.dispatchEvent(new CustomEvent('vg:venta-preload-fecha', { detail: { fechaLSR } }))
+  }
+  window.addEventListener('vg:go-crear-reserva', onGoCrear as EventListener)
+  return () => window.removeEventListener('vg:go-crear-reserva', onGoCrear as EventListener)
 }, [])
   
   // 2) Suscripción Realtime (se activa cuando authReady === true)
