@@ -216,7 +216,7 @@ function loadEffectiveConfig(): EffectiveConfig {
       CM: stored?.ratesPromo?.CM ?? defaultPromo.CM,
     },
     proveedores: stored?.proveedores ?? ['Mármol Expediciones','Mármol Patagonia'],
-    mediosPago: stored?.mediosPago ?? ['tarjeta','efectivo','efx','transferencia'],
+    mediosPago: stored?.mediosPago ?? ['tarjeta','asd1234','efx','transferencia'],
   }
   return conf
 }
