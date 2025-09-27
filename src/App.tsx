@@ -27,29 +27,6 @@ import { saveReservaEnBD } from './db'
 // === Registry de códigos retirados (no reutilizables) ===
 // Navegación desde Visor Diario → Ingreso de venta con fecha precargada
 
-const [mediosPagoDB, setMediosPagoDB] = useState<string[]>([
-  'tarjeta','efectivo','efx','transferencia'
-])
-
-async function refreshMediosPagoFromDB() {
-  try {
-    const { data, error } = await supabase
-      .from('config_admin')
-      .select('medios_pago, updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) throw error
-    if (Array.isArray(data?.medios_pago)) {
-      setMediosPagoDB(data!.medios_pago as string[])
-    }
-  } catch (e) {
-    console.error('[VG] refreshMediosPagoFromDB:', e)
-    // Si falla, mantenemos el estado actual (o los 4 por defecto)
-  }
-}
-
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
 
 
@@ -176,39 +153,6 @@ async function mirrorVendorOverridesFromDB() {
     console.error('[VG] mirrorVendorOverridesFromDB:', e)
   }
 }
-// Refleja la configuración admin (incluye mediosPago) desde BD hacia localStorage
-async function mirrorAdminConfigFromDB() {
-  try {
-    const { data, error } = await supabase
-      .from('config_admin')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) throw error
-    if (!data) return
-
-    const next = {
-      bajaMonths: data.baja_months || [],
-      altaMonths: data.alta_months || [],
-      ratesLSR: data.rates_lsr || { alta:{adulto:0,nino:0,infante:0}, baja:{adulto:0,nino:0,infante:0} },
-      transport: data.transport || { alta:0, baja:0 },
-      ratesPromo: data.rates_promo || { FM:{adulto:0,nino:0,infante:0}, CM:{adulto:0,nino:0,infante:0} },
-      proveedores: data.proveedores || [],
-      mediosPago: data.medios_pago || [],
-    }
-
-    // Guardar en localStorage (la app ya sabe leer LS_ADMIN_CONF)
-    localStorage.setItem(LS_ADMIN_CONF, JSON.stringify(next))
-
-    // Notificar a la UI (ambos eventos ya están conectados en App)
-    window.dispatchEvent(new Event('storage'))
-    window.dispatchEvent(new Event('vg:config-updated'))
-  } catch (e) {
-    console.error('[VG] mirrorAdminConfigFromDB:', e)
-  }
-}
 // Helpers para resolver el vendedor visible
 function vendorNameFromCodigo(code: string): string {
   const c = (code || '').toString()
@@ -310,19 +254,6 @@ export default function App(){
     )
     return () => { sub.subscription?.unsubscribe?.() }
   }, [])
-// Al montar la app, traer la configuración admin (mediosPago, proveedores, tarifas) desde BD
-useEffect(() => {
-   // No depende del login; si tu RLS permite lectura pública, esto funcionará en incógnito.
-  // Si en tu proyecto la tabla requiere sesión, igual se ejecutará tras el primer login.
-  mirrorAdminConfigFromDB()
-}, [])
-
-useEffect(() => {
-  refreshMediosPagoFromDB()
-  const onConfigUpdated = () => refreshMediosPagoFromDB()
-  window.addEventListener('vg:config-updated', onConfigUpdated)
-  return () => window.removeEventListener('vg:config-updated', onConfigUpdated)
-}, [])
 
   // 🔔 Versión de overrides para forzar re-montar VendorLogin cuando cambien
 const [vendorsVersion, setVendorsVersion] = useState(0)
