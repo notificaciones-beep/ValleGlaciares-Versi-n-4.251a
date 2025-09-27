@@ -73,10 +73,8 @@ export default function PostVentaPagos(
         codigo: rsv.codigo,           // <- requerido por tu esquema (NOT NULL)
         medio, monto,
         comprobante: (((comprobante || '').trim() ? ((comprobante || '').trim() + ' · ') : '') + 'vend:' + vendedorActual)
-        
       });
       if (eIns) throw eIns;
-      window.dispatchEvent(new Event('vg:pagos-updated'))
 
     } catch(e:any){
       alert('No se pudo guardar el pago en la BD: ' + (e?.message || e))

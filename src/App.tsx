@@ -14,7 +14,6 @@ import BaseDatos from './components/BaseDatos'
 import { MedioPago, LocalDB, Passenger, VendorKey, VoucherData, BasePasajerosRow, BasePagosRow } from './types'
 import { CLP, nowISO } from './utils'
 import { DEFAULT_PASSWORDS, LS_DB, LS_PASSWORDS, VENDORS, loadJSON, saveJSON } from './state'
-import RegistroPagos from './components/RegistroPagos'
 import { printVoucher } from './printVoucher'
 import { correoReservaHTML } from './emailTemplates'
 import { dialogStyle, overlayStyle } from './styles'
@@ -240,7 +239,6 @@ function getSeasonFromConfig(dateStr:string, conf:EffectiveConfig): 'alta'|'baja
 
 export default function App(){
   const [user, setUser] = useState<any>(null)
-  const isAdmin = !!(user?.user_metadata?.role === 'admin')
   const [authReady, setAuthReady] = useState(false)
   
   useEffect(() => {
@@ -340,7 +338,7 @@ useEffect(() => {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showConfirmReserva, setShowConfirmReserva] = useState(false)
-  const [tab, setTab] = useState<'venta'|'postventa'|'visor'|'mensual'|'mod'|'base'|'admin'|'registroPagos'>('venta')
+  const [tab, setTab] = useState<'venta'|'postventa'|'visor'|'mensual'|'mod'|'base'|'admin'>('venta')
 
   const [idAction, setIdAction] = useState<{open:boolean,id:string}|null>(null)
   const [postVentaInitialId, setPostVentaInitialId] = useState<string>('')
@@ -945,6 +943,8 @@ useEffect(() => {
     while (n <= end && nums.has(n)) n++
     return `${prefix}${n}`
   }, [loggedVendor, db.base_pasajeros, db.base_pagos, db.history])
+  
+
   return gate ? (gate) : (
     <div style={{padding:16, maxWidth: '100%', margin:'0 auto'}}>
       <div style={{display:'flex', gap:12, alignItems:'center', justifyContent:'space-between', marginBottom:12}}>
@@ -957,13 +957,6 @@ useEffect(() => {
         </div>
       </div>
 
-      <button onClick={() => setTab('venta')}>Ingreso de Venta</button>
-      {isAdmin && (
-        <button onClick={() => setTab('registroPagos')}>Registro de Pagos</button>
-        )}
-
-        
-
       <div style={{border:'1px solid #e5e7eb', borderRadius:10, padding:8, marginBottom:12, display:'flex', gap:8, flexWrap:'wrap'}}>
        <button onClick={()=>setTab('venta')} style={{fontWeight: tab==='venta'?700:400}}>Ingreso de venta</button>
         <button onClick={()=>setTab('postventa')} style={{fontWeight: tab==='postventa'?700:400}}>Post-venta: Pagos/Reembolsos</button>
@@ -971,23 +964,10 @@ useEffect(() => {
         <button onClick={()=>{ setTab('mensual'); setRefreshTick(t=>t+1) }} style={{fontWeight: tab==='mensual'?700:400}}>Visor mensual</button>
         <button onClick={()=>setTab('mod')} style={{fontWeight: tab==='mod'?700:400}}>Modificaciones</button>
         <button onClick={()=>setTab('base')} style={{fontWeight: tab==='base'?700:400}}>Base de datos</button>
-        {isAdmin && (
-  <button onClick={()=>setTab('registroPagos')} style={{fontWeight: tab==='registroPagos'?700:400}}>
-    Registro de Pagos
-  </button>
-)}
         {(getVendorMeta(loggedVendor!).name === 'Admin' || loggedVendor === 'javier') && (
            <button onClick={()=>setTab('admin')} style={{fontWeight: tab==='admin'?700:400}}>Configuraciones avanzadas</button>
            )}
       </div>
-      
-
-      {tab === 'registroPagos' && isAdmin && (
-  <RegistroPagos
-    // Si manejas un mapa UID->Nombre de vendedor, pásalo aquí (opcional):
-    // vendorNameByUid={vendorNameByUid}
-  />
-)}
       
 
       {tab==='venta' ? (
