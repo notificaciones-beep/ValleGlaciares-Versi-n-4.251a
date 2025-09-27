@@ -27,6 +27,29 @@ import { saveReservaEnBD } from './db'
 // === Registry de códigos retirados (no reutilizables) ===
 // Navegación desde Visor Diario → Ingreso de venta con fecha precargada
 
+const [mediosPagoDB, setMediosPagoDB] = useState<string[]>([
+  'tarjeta','efectivo','efx','transferencia'
+])
+
+async function refreshMediosPagoFromDB() {
+  try {
+    const { data, error } = await supabase
+      .from('config_admin')
+      .select('medios_pago, updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    if (Array.isArray(data?.medios_pago)) {
+      setMediosPagoDB(data!.medios_pago as string[])
+    }
+  } catch (e) {
+    console.error('[VG] refreshMediosPagoFromDB:', e)
+    // Si falla, mantenemos el estado actual (o los 4 por defecto)
+  }
+}
+
 const LS_ID_RETIRED = 'vg_id_retired' // Set<string> de IDs totales, ej: A2, B15...
 
 
@@ -292,6 +315,13 @@ useEffect(() => {
    // No depende del login; si tu RLS permite lectura pública, esto funcionará en incógnito.
   // Si en tu proyecto la tabla requiere sesión, igual se ejecutará tras el primer login.
   mirrorAdminConfigFromDB()
+}, [])
+
+useEffect(() => {
+  refreshMediosPagoFromDB()
+  const onConfigUpdated = () => refreshMediosPagoFromDB()
+  window.addEventListener('vg:config-updated', onConfigUpdated)
+  return () => window.removeEventListener('vg:config-updated', onConfigUpdated)
 }, [])
 
   // 🔔 Versión de overrides para forzar re-montar VendorLogin cuando cambien
