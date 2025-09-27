@@ -56,13 +56,16 @@ export default function Modificaciones(
 
   // ---------- helpers ----------
   function nextGroupForDate(fecha: string): string {
-    if(!fecha) return ''
-    const sameDay = db.base_pasajeros.filter(r=> (r.fecha_lsr||'') === fecha )
-    const maxNg = sameDay.reduce((m, r)=>{
-      const n = parseInt(String(r.ng || '0'), 10)
-      return Number.isFinite(n) ? Math.max(m, n) : m
-    }, 0)
-    return String(maxNg + 1)
+    if (!fecha) return ''
+    const used = new Set(
+      db.base_pasajeros
+        .filter(r => (r.fecha_lsr || '') === fecha)
+        .map(r => parseInt(String(r.ng || '0'), 10))
+        .filter(n => Number.isFinite(n) && n > 0)
+    )
+    let i = 1
+    while (used.has(i)) i++
+    return String(i)
   }
 
   // Al montar: si hay un último ID usado, cargarlo automáticamente

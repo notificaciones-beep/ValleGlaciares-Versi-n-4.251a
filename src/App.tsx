@@ -364,7 +364,7 @@ useEffect(() => {
         // 1) Leer RESERVAS (sin relaciones anidadas)
         const { data: rs, error: eR } = await supabase
         .from('reservas')
-        .select('id,codigo,vendedor_uid,fecha_lsr,valor_transporte,descuento_lsr,proveedor,servicio_cm,fecha_cm,valor_cm,descuento_cm,observacion,created_at')
+        .select('id,codigo,vendedor_uid,fecha_lsr,valor_transporte,descuento_lsr,proveedor,servicio_cm,fecha_cm,valor_cm,descuento_cm,observacion,created_at,grupo_ng')
         if (eR) {
           console.error('[VG] leer reservas:', eR)
           alert('No se pudieron leer reservas: ' + (eR.message || JSON.stringify(eR)))
@@ -417,24 +417,47 @@ useEffect(() => {
         const base_pasajeros: BasePasajerosRow[] = []
         const base_pagos: BasePagosRow[] = []
 
-        // NG por fecha: orden estable (created_at, luego codigo)
-        const codesByDate = new Map<string, {code:string, created:string}[]>()
-          
+        // NG por fecha: usar grupo_ng persistido y considerar SOLO reservas con pasajeros
+        const ngByCode = new Map<string, string>()
+
+        // 1) Mapear reservas por fecha que tienen al menos 1 pasajero
+        const hasPax = new Set<number>()
+        for (const [rid, arr] of paxByReserva) {
+          if ((arr || []).length > 0) hasPax.add(rid)
+        }
+        
+        const byDate: Record<string, { code: string; created: string; ng?: number }[]> = {}
         for (const r of (rs || [])) {
           if (!r.fecha_lsr) continue
-          const arr = codesByDate.get(r.fecha_lsr) || []
-          arr.push({ code: r.codigo, created: r.created_at || '9999-12-31T23:59:59Z' })
-          codesByDate.set(r.fecha_lsr, arr)
+          if (!hasPax.has(r.id)) continue  // sin pasajeros no ocupa NG
+          const list = byDate[r.fecha_lsr] || []
+          list.push({ code: r.codigo, created: r.created_at || '9999-12-31T23:59:59Z', ng: (r as any).grupo_ng ?? undefined })
+          byDate[r.fecha_lsr] = list
         }
-        const ngByCode = new Map<string, string>()
-        for (const [date, arr] of codesByDate) {
-          arr.sort((a,b)=>{
+        
+        // 2) Para cada fecha: respetar los NG ya guardados y rellenar huecos con mínimos disponibles
+        for (const date of Object.keys(byDate)) {
+          const arr = byDate[date].sort((a,b)=>{
             if (a.created < b.created) return -1
             if (a.created > b.created) return 1
             return a.code.localeCompare(b.code)
           })
-          arr.forEach((x, i)=> ngByCode.set(x.code, String(i+1)))
-        } 
+        
+          const used = new Set<number>()
+          for (const x of arr) {
+            if (Number.isFinite(x.ng) && (x.ng as number) > 0) used.add(x.ng as number)
+          }
+        
+          for (const x of arr) {
+            if (!Number.isFinite(x.ng) || (x.ng as number) <= 0) {
+              let i = 1
+              while (used.has(i)) i++
+              x.ng = i
+              used.add(i)
+            }
+            ngByCode.set(x.code, String(x.ng))
+          }
+        }
 
         
         for (const r of (rs||[])) {

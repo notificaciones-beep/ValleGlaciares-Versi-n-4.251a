@@ -1,7 +1,38 @@
 // src/db.ts
 import { supabase } from './supabaseClient'
 import type { VoucherData } from './types'
+async function computeNextNgForDate(fecha: string, excludeReservaId?: number): Promise<number> {
+  if (!fecha) return 1
+  // 1) Traer reservas de la fecha con su id y grupo_ng
+  const { data: rs, error: eR } = await supabase
+    .from('reservas')
+    .select('id, grupo_ng')
+    .eq('fecha_lsr', fecha)
+  if (eR) throw eR
 
+  const ids = (rs || []).map(r => r.id).filter((id: any) => id !== excludeReservaId)
+  if (!ids.length) return 1
+
+  // 2) Ver cuáles tienen pasajeros (sólo esas ocupan NG)
+  const { data: ps, error: eP } = await supabase
+    .from('pasajeros')
+    .select('reserva_id')
+    .in('reserva_id', ids as any)
+  if (eP) throw eP
+
+  const withPax = new Set((ps || []).map(p => p.reserva_id))
+  const used = new Set<number>()
+  for (const r of (rs || [])) {
+    if (r.id === excludeReservaId) continue
+    if (!withPax.has(r.id)) continue
+    const n = Number(r.grupo_ng || 0)
+    if (Number.isFinite(n) && n > 0) used.add(n)
+  }
+
+  let i = 1
+  while (used.has(i)) i++
+  return i
+}
 export async function saveReservaEnBD(
   snap: VoucherData,
   vendedorUid: string,
@@ -24,8 +55,8 @@ export async function saveReservaEnBD(
     (snap as any).fecha_cm ??
     (snap as any).fechaCM ??
     null;
-
-  // 1) Inserta la reserva
+    const grupoNg = snap.fechaLSR ? await computeNextNgForDate(snap.fechaLSR) : null
+  // 1) Inserta la reserva 
   const { data: reserva, error } = await supabase
     .from('reservas')
     .insert({
@@ -34,6 +65,7 @@ export async function saveReservaEnBD(
 
       // LSR
       fecha_lsr: snap.fechaLSR || null,
+      grupo_ng: grupoNg,
       valor_lsr: snap.lsrSubtotal ?? 0,
       valor_transporte: (snap as any).transporte ?? 0,
       descuento_lsr: snap.lsrDcto ?? 0,
@@ -132,7 +164,7 @@ export async function updateReservaEnBD(params: {
   // 1) localizar reserva
   const { data: r, error: e1 } = await supabase
     .from('reservas')
-    .select('id, observacion')
+    .select('id, observacion, fecha_lsr, grupo_ng')
     .eq('codigo', codigo)
     .maybeSingle()
   if (e1) throw e1
@@ -146,6 +178,11 @@ export async function updateReservaEnBD(params: {
     : `${prefix}${motivoMod.trim()}`
 
   // 3) actualizar cabecera
+  let grupoNg: number | null = (r as any).grupo_ng ?? null
+  if (fechaLSR && fechaLSR !== (r as any).fecha_lsr) {
+    grupoNg = await computeNextNgForDate(fechaLSR, r.id)
+  }
+  
   const { error: e2 } = await supabase
     .from('reservas')
     .update({
@@ -154,6 +191,7 @@ export async function updateReservaEnBD(params: {
       descuento_lsr: descuentoLSR,
       servicio_cm: servicioCM,
       fecha_cm: fechaCM,
+      grupo_ng: grupoNg,
       proveedor: proveedorCM,
       valor_cm: valorCMBruto,
       descuento_cm: descuentoCM,
