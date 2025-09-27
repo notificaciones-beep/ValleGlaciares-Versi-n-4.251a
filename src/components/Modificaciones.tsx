@@ -367,7 +367,7 @@ export default function Modificaciones(
       id: loadedId,
       medio: 'transferencia',
       monto: 0,
-      comprobante: `MOD: ${motivo}`
+      comprobante: `MOD: ${motivo} · vend:${vendedorActual}`
     }
     setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, mov]}))
   
@@ -398,6 +398,25 @@ export default function Modificaciones(
         }))
       })
       alert('Modificación guardada y sincronizada en BD.')
+      // Log en BD como pago 0 (incluye vendedor)
+      try {
+        const { data: rsv2, error: eFind2 } = await supabase
+          .from('reservas')
+          .select('id,codigo')
+          .eq('codigo', loadedId)
+          .maybeSingle()
+        if (!eFind2 && rsv2?.id) {
+          await supabase.from('pagos').insert({
+            reserva_id: rsv2.id,
+            codigo: rsv2.codigo,
+            medio: 'modificacion',
+            monto: 0,
+            comprobante: `MOD: ${motivo} · vend:${vendedorActual}`
+          })
+        }
+      } catch (e) {
+        console.warn('[Modificaciones] log de modificación no persistido en pagos:', e)
+      }
     }catch(e:any){
       console.error('[Modificaciones] updateReservaEnBD', e)
       alert('Se guardó localmente, pero falló la sincronización con BD: ' + (e?.message || e))
@@ -422,7 +441,7 @@ export default function Modificaciones(
       id: loadedId,
       medio: 'transferencia',
       monto: 0,
-      comprobante: `DEL: ${motivoDelete}`
+      comprobante: `DEL: ${motivoDelete} · vend:${vendedorActual}`
     }
     setDb(prev=> ({...prev, base_pagos: [...prev.base_pagos, mov]}))
 

@@ -45,7 +45,7 @@ export default function PostVentaPagos(
       createdAt: nowISO(),
       vendedor: vendedorActual,
       id: found.id,
-      medio, monto, comprobante: comprobante || ''
+      medio, monto, comprobante: (((comprobante || '').trim() ? ((comprobante || '').trim() + ' · ') : '') + 'vend:' + vendedorActual)
     }
     // === Persistir pago en Supabase ===
     try{
@@ -72,7 +72,7 @@ export default function PostVentaPagos(
         reserva_id: rsv.id,
         codigo: rsv.codigo,           // <- requerido por tu esquema (NOT NULL)
         medio, monto,
-        comprobante: comprobante || null
+        comprobante: (((comprobante || '').trim() ? ((comprobante || '').trim() + ' · ') : '') + 'vend:' + vendedorActual)
       });
       if (eIns) throw eIns;
 

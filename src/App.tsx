@@ -151,7 +151,32 @@ async function mirrorVendorOverridesFromDB() {
     console.error('[VG] mirrorVendorOverridesFromDB:', e)
   }
 }
+// Helpers para resolver el vendedor visible
+function vendorNameFromCodigo(code: string): string {
+  const c = (code || '').toString()
+  if (!c) return '—'
+  let overrides: Record<string, any> = {}
+  try { overrides = JSON.parse(localStorage.getItem(LS_VENDOR_OVERRIDES) || '{}') } catch { overrides = {} }
+  const keys = Array.from(new Set([...Object.keys(VENDORS), ...Object.keys(overrides)]))
+  let bestName = ''
+  let bestLen = -1
+  for (const k of keys) {
+    const meta = getVendorMeta(k)
+    const prefix = (meta?.prefix || '').toString()
+    if (!prefix) continue
+    if (c.startsWith(prefix) && prefix.length > bestLen) {
+      bestLen = prefix.length
+      bestName = meta.name
+    }
+  }
+  return bestName || '—'
+}
 
+function vendorFromComprobante(val: any): string | null {
+  const s = (val ?? '').toString()
+  const m = s.match(/vend\s*:\s*([^\n\r·]+)/i)
+  return m ? m[1].trim() : null
+}
 function codeFrom(v: VendorKey, n: number) {
   return `${getVendorMeta(v).prefix}${n}` // sin ceros a la izquierda
 }
@@ -426,7 +451,7 @@ useEffect(() => {
             base_pasajeros.push({
               createdAt: r.created_at || nowISO(),
               estado: 'reserva',
-              vendedor: '(BD)',
+              vendedor: vendorNameFromCodigo(r.codigo),
               id: r.codigo,
               ng: ngByCode.get(r.codigo) || '—',
               nombre: p.nombre || '',
@@ -473,7 +498,7 @@ useEffect(() => {
           for (const p of (pagosByReserva.get(r.id) || [])) {
             base_pagos.push({
               createdAt: p.created_at || nowISO(),
-              vendedor: '(BD)',
+              vendedor: (vendorFromComprobante((p as any).comprobante) || vendorNameFromCodigo(r.codigo)),
               id: r.codigo,
               medio: p.medio || '',
               monto: p.monto || 0,
