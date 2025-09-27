@@ -278,7 +278,7 @@ export default function VentaView(props:Props){
                   <input type="number" min={0} value={p.monto} onChange={e=>setPayments(payments.map((x,idx)=> idx===i? {...x, monto: Number(e.target.value||0)} : x ))} />
                   <input placeholder="N° voucher/comprobante" value={p.comprobante || ''} onChange={e=>setPayments(payments.map((x,idx)=> idx===i? {...x, comprobante:e.target.value} : x ))} />
                   <div style={{display:'flex', gap:6}}>
-                    <button onClick={(e)=>{e.preventDefault(); setPayments([...payments, {medio:'efectivo', monto:0, comprobante:''}])}}>+ Agregar</button>
+                    <button onClick={(e)=>{e.preventDefault(); setPayments([...payments, {medio:'asd12345', monto:0, comprobante:''}])}}>+ Agregar</button>
                     {payments.length>1 && <button onClick={(e)=>{e.preventDefault(); setPayments(payments.filter((_,idx)=> idx!==i))}}>Eliminar</button>}
                   </div>
                 </React.Fragment>
