@@ -572,7 +572,59 @@ useEffect(() => {
 useEffect(() => {
   if (!authReady) return
   mirrorVendorOverridesFromDB()
+  // También cargar configuraciones avanzadas al inicio
+  loadConfigFromDBOnStartup()
 }, [authReady])
+
+// Nueva función para cargar configuraciones al inicio
+async function loadConfigFromDBOnStartup() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    // 1) Cargar configuraciones globales
+    const { data: configRow, error: configError } = await supabase
+      .from('config_admin')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    
+    if (configError) {
+      console.error('[VG] Error cargando config admin:', configError)
+      return
+    }
+
+    if (configRow) {
+      const config: EffectiveConfig = {
+        bajaMonths: configRow.baja_months || [10,11,12,3,4],
+        altaMonths: configRow.alta_months || [1,2],
+        ratesLSR: configRow.rates_lsr || { 
+          alta: { adulto:155000, nino:90000, infante:0 }, 
+          baja: { adulto:145000, nino:80000, infante:0 } 
+        },
+        transport: configRow.transport || { alta:25000, baja:25000 },
+        ratesPromo: configRow.rates_promo || { 
+          FM: { adulto:28000, nino:28000, infante:28000 }, 
+          CM: { adulto:15000, nino:15000, infante:15000 } 
+        },
+        proveedores: configRow.proveedores || ['Mármol Expediciones','Mármol Patagonia'],
+        mediosPago: configRow.medios_pago || ['tarjeta','efectivo','efx','transferencia'],
+      }
+      
+      // Guardar en localStorage y actualizar estado
+      localStorage.setItem(LS_ADMIN_CONF, JSON.stringify(config))
+      setEffectiveConf(config)
+      window.dispatchEvent(new Event('vg:config-updated'))
+    }
+
+    // 2) Cargar overrides de vendedores (ya existe mirrorVendorOverridesFromDB)
+    await mirrorVendorOverridesFromDB()
+    
+  } catch (e) {
+    console.error('[VG] Error en carga inicial de configuraciones:', e)
+  }
+}
 
   useEffect(()=>{
     if (tab==='visor' || tab==='mensual') {
